@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -22,8 +23,43 @@ const categories = [
   { id: "other", name: "Outros", icon: "📋" }
 ];
 
+// Lista de denúncias em memória (simulando um banco de dados)
+const reportsList = [
+  {
+    id: "1",
+    title: "Buraco na calçada",
+    description: "Há um buraco grande na calçada que está causando acidentes com pedestres.",
+    category: "Calçadas e Vias",
+    location: "Rua das Flores, 123",
+    status: "pending",
+    date: "22/04/2023",
+    imageUrl: "https://images.unsplash.com/photo-1615729947596-a598e5de0ab3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
+  },
+  {
+    id: "2",
+    title: "Lâmpada queimada",
+    description: "Poste de iluminação com lâmpada queimada há mais de duas semanas.",
+    category: "Iluminação Pública",
+    location: "Av. Principal, 500",
+    status: "in-progress",
+    date: "15/04/2023",
+    imageUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
+  },
+  {
+    id: "3",
+    title: "Lixo acumulado",
+    description: "Lixo acumulado na esquina, atraindo animais e causando mau cheiro na vizinhança.",
+    category: "Limpeza Urbana",
+    location: "Rua dos Ipês, 78",
+    status: "resolved",
+    date: "10/04/2023",
+    imageUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
+  }
+];
+
 const ReportProblem = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [title, setTitle] = useState("");
@@ -84,7 +120,28 @@ const ReportProblem = () => {
       return;
     }
     
-    // Aqui seria a lógica para enviar o relatório ao backend
+    // Criando uma nova denúncia (na vida real, isso seria enviado a um servidor)
+    const newReport = {
+      id: (reportsList.length + 1).toString(),
+      title,
+      description,
+      category: selectedCategory === "streets" ? "Calçadas e Vias" : 
+               selectedCategory === "lighting" ? "Iluminação" :
+               selectedCategory === "garbage" ? "Lixo" :
+               selectedCategory === "water" ? "Água e Esgoto" :
+               selectedCategory === "signs" ? "Sinalização" :
+               selectedCategory === "parks" ? "Praças e Parques" :
+               selectedCategory === "public-buildings" ? "Prédios Públicos" : "Outros",
+      location: location.address,
+      status: "pending" as const,
+      date: new Date().toLocaleDateString(),
+      imageUrl: previewImages[0] || "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
+    };
+    
+    // Adicionando a nova denúncia à lista (simulando um banco de dados)
+    reportsList.push(newReport);
+    
+    // Log para debug
     console.log({
       title,
       description,
@@ -98,13 +155,10 @@ const ReportProblem = () => {
       description: "Você poderá acompanhar o status da sua denúncia em 'Minhas Denúncias'.",
     });
     
-    // Limpar formulário
-    setTitle("");
-    setDescription("");
-    setSelectedCategory("");
-    setLocation(null);
-    setImages([]);
-    setPreviewImages([]);
+    // Redirecionar para a página de detalhes da denúncia
+    setTimeout(() => {
+      navigate(`/report/${newReport.id}`);
+    }, 1500);
   };
 
   return (

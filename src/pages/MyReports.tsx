@@ -16,7 +16,7 @@ const mockReports = [
     description: "Há um buraco grande na calçada que está causando acidentes com pedestres.",
     category: "Calçadas e Vias",
     location: "Rua das Flores, 123",
-    status: "pending",
+    status: "pending" as const,
     date: "22/04/2023",
     imageUrl: "https://images.unsplash.com/photo-1615729947596-a598e5de0ab3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
   },
@@ -26,7 +26,7 @@ const mockReports = [
     description: "Poste de iluminação com lâmpada queimada há mais de duas semanas.",
     category: "Iluminação Pública",
     location: "Av. Principal, 500",
-    status: "in-progress",
+    status: "in-progress" as const,
     date: "15/04/2023",
     imageUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
   },
@@ -36,11 +36,11 @@ const mockReports = [
     description: "Lixo acumulado na esquina, atraindo animais e causando mau cheiro na vizinhança.",
     category: "Limpeza Urbana",
     location: "Rua dos Ipês, 78",
-    status: "resolved",
+    status: "resolved" as const,
     date: "10/04/2023",
     imageUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
   }
-] as const;
+];
 
 const MyReports = () => {
   const filterReports = (status?: string) => {
@@ -101,7 +101,7 @@ const MyReports = () => {
                       description={report.description}
                       category={report.category}
                       location={report.location}
-                      status={report.status as any}
+                      status={report.status}
                       date={report.date}
                       imageUrl={report.imageUrl}
                     />
@@ -119,7 +119,7 @@ const MyReports = () => {
                       description={report.description}
                       category={report.category}
                       location={report.location}
-                      status={report.status as any}
+                      status={report.status}
                       date={report.date}
                       imageUrl={report.imageUrl}
                     />
@@ -137,7 +137,7 @@ const MyReports = () => {
                       description={report.description}
                       category={report.category}
                       location={report.location}
-                      status={report.status as any}
+                      status={report.status}
                       date={report.date}
                       imageUrl={report.imageUrl}
                     />
@@ -155,7 +155,7 @@ const MyReports = () => {
                       description={report.description}
                       category={report.category}
                       location={report.location}
-                      status={report.status as any}
+                      status={report.status}
                       date={report.date}
                       imageUrl={report.imageUrl}
                     />
