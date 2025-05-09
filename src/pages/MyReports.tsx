@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -11,11 +11,12 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Report, ReportStatus } from "@/types/report";
 
 const MyReports = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState<string>("all");
   
   const {
     data: reports,
@@ -46,7 +47,7 @@ const MyReports = () => {
     enabled: !!user
   });
   
-  const filterReports = (status?: string) => {
+  const filterReports = (status?: ReportStatus | "all") => {
     if (!reports) return [];
     
     if (status && status !== "all") {
@@ -137,7 +138,7 @@ const MyReports = () => {
                       description={report.description}
                       category={report.category}
                       location={report.location}
-                      status={report.status}
+                      status={report.status as ReportStatus}
                       date={new Date(report.created_at).toLocaleDateString()}
                       imageUrl={report.image_url}
                     />
@@ -147,7 +148,7 @@ const MyReports = () => {
               
               <TabsContent value="pending" className="mt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterReports('pending').map((report) => (
+                  {filterReports('pending' as ReportStatus).map((report) => (
                     <ReportCard
                       key={report.id}
                       id={report.id}
@@ -155,7 +156,7 @@ const MyReports = () => {
                       description={report.description}
                       category={report.category}
                       location={report.location}
-                      status={report.status}
+                      status={report.status as ReportStatus}
                       date={new Date(report.created_at).toLocaleDateString()}
                       imageUrl={report.image_url}
                     />
@@ -165,7 +166,7 @@ const MyReports = () => {
               
               <TabsContent value="in-progress" className="mt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterReports('in-progress').map((report) => (
+                  {filterReports('in-progress' as ReportStatus).map((report) => (
                     <ReportCard
                       key={report.id}
                       id={report.id}
@@ -173,7 +174,7 @@ const MyReports = () => {
                       description={report.description}
                       category={report.category}
                       location={report.location}
-                      status={report.status}
+                      status={report.status as ReportStatus}
                       date={new Date(report.created_at).toLocaleDateString()}
                       imageUrl={report.image_url}
                     />
@@ -183,7 +184,7 @@ const MyReports = () => {
               
               <TabsContent value="resolved" className="mt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterReports('resolved').map((report) => (
+                  {filterReports('resolved' as ReportStatus).map((report) => (
                     <ReportCard
                       key={report.id}
                       id={report.id}
@@ -191,7 +192,7 @@ const MyReports = () => {
                       description={report.description}
                       category={report.category}
                       location={report.location}
-                      status={report.status}
+                      status={report.status as ReportStatus}
                       date={new Date(report.created_at).toLocaleDateString()}
                       imageUrl={report.image_url}
                     />

@@ -34,23 +34,23 @@ const MakeAdmin = () => {
       
       // Check if user exists in Supabase
       const { data: userData, error: userError } = await supabase
-        .from("auth.users")
-        .select("id")
-        .eq("email", email)
-        .single();
+        .rpc('get_user_id_by_email', { email_input: email });
       
       if (userError) {
-        if (userError.code === "PGRST116") {
-          throw new Error("Usuário não encontrado. Verifique o email.");
-        }
         throw userError;
       }
+      
+      if (!userData || !userData.length) {
+        throw new Error("Usuário não encontrado. Verifique o email.");
+      }
+      
+      const userId = userData[0].id;
       
       // Make user an admin
       const { error } = await supabase
         .from("user_roles")
         .insert({
-          user_id: userData.id,
+          user_id: userId,
           role: "admin"
         });
       
