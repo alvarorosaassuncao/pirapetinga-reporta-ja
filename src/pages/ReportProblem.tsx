@@ -11,6 +11,8 @@ import { Camera, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import CategorySelector from "@/components/CategorySelector";
 import LocationPicker from "@/components/LocationPicker";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const categories = [
   { id: "streets", name: "Calçadas e Vias", icon: "🛣️" },
@@ -23,43 +25,10 @@ const categories = [
   { id: "other", name: "Outros", icon: "📋" }
 ];
 
-// Lista de denúncias em memória (simulando um banco de dados)
-const reportsList = [
-  {
-    id: "1",
-    title: "Buraco na calçada",
-    description: "Há um buraco grande na calçada que está causando acidentes com pedestres.",
-    category: "Calçadas e Vias",
-    location: "Rua das Flores, 123",
-    status: "pending",
-    date: "22/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1615729947596-a598e5de0ab3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  },
-  {
-    id: "2",
-    title: "Lâmpada queimada",
-    description: "Poste de iluminação com lâmpada queimada há mais de duas semanas.",
-    category: "Iluminação Pública",
-    location: "Av. Principal, 500",
-    status: "in-progress",
-    date: "15/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  },
-  {
-    id: "3",
-    title: "Lixo acumulado",
-    description: "Lixo acumulado na esquina, atraindo animais e causando mau cheiro na vizinhança.",
-    category: "Limpeza Urbana",
-    location: "Rua dos Ipês, 78",
-    status: "resolved",
-    date: "10/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  }
-];
-
 const ReportProblem = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [title, setTitle] = useState("");
@@ -67,6 +36,7 @@ const ReportProblem = () => {
   const [images, setImages] = useState<File[]>([]);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [location, setLocation] = useState<{ address: string; latitude: number; longitude: number } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -90,8 +60,17 @@ const ReportProblem = () => {
     setPreviewImages(updatedPreviews);
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      toast({
+        title: "Erro de autenticação",
+        description: "Você precisa estar logado para enviar uma denúncia.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (!selectedCategory) {
       toast({
@@ -120,45 +99,64 @@ const ReportProblem = () => {
       return;
     }
     
-    // Criando uma nova denúncia (na vida real, isso seria enviado a um servidor)
-    const newReport = {
-      id: (reportsList.length + 1).toString(),
-      title,
-      description,
-      category: selectedCategory === "streets" ? "Calçadas e Vias" : 
-               selectedCategory === "lighting" ? "Iluminação" :
-               selectedCategory === "garbage" ? "Lixo" :
-               selectedCategory === "water" ? "Água e Esgoto" :
-               selectedCategory === "signs" ? "Sinalização" :
-               selectedCategory === "parks" ? "Praças e Parques" :
-               selectedCategory === "public-buildings" ? "Prédios Públicos" : "Outros",
-      location: location.address,
-      status: "pending" as const,
-      date: new Date().toLocaleDateString(),
-      imageUrl: previewImages[0] || "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-    };
+    setIsSubmitting(true);
     
-    // Adicionando a nova denúncia à lista (simulando um banco de dados)
-    reportsList.push(newReport);
-    
-    // Log para debug
-    console.log({
-      title,
-      description,
-      category: selectedCategory,
-      location,
-      images
-    });
-    
-    toast({
-      title: "Denúncia enviada com sucesso!",
-      description: "Você poderá acompanhar o status da sua denúncia em 'Minhas Denúncias'.",
-    });
-    
-    // Redirecionar para a página de detalhes da denúncia
-    setTimeout(() => {
-      navigate(`/report/${newReport.id}`);
-    }, 1500);
+    try {
+      // Prepare category name
+      const categoryName = categories.find(c => c.id === selectedCategory)?.name || selectedCategory;
+      
+      // First insert the report
+      const { data: reportData, error: reportError } = await supabase
+        .from("reports")
+        .insert({
+          user_id: user.id,
+          title,
+          description,
+          category: categoryName,
+          location: location.address,
+          status: "pending",
+          // We'll update this later if there are images
+          image_url: previewImages.length > 0 ? null : undefined,
+        })
+        .select()
+        .single();
+      
+      if (reportError) throw reportError;
+      
+      // If there are images, upload the first one to Supabase Storage
+      // Note: For a production app, you would want to create a storage bucket for this
+      // In this demo we'll use a placeholder URL instead
+      let imageUrl = "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80";
+      
+      // Update the report with the image URL if there is one
+      if (previewImages.length > 0) {
+        const { error: updateError } = await supabase
+          .from("reports")
+          .update({ image_url: imageUrl })
+          .eq("id", reportData.id);
+        
+        if (updateError) throw updateError;
+      }
+      
+      toast({
+        title: "Denúncia enviada com sucesso!",
+        description: "Você poderá acompanhar o status da sua denúncia em 'Minhas Denúncias'.",
+      });
+      
+      // Redirect to the report detail page
+      setTimeout(() => {
+        navigate(`/report/${reportData.id}`);
+      }, 1500);
+      
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar denúncia",
+        description: error.message || "Ocorreu um erro ao tentar enviar sua denúncia. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -252,8 +250,12 @@ const ReportProblem = () => {
                 <LocationPicker onSelectLocation={setLocation} />
               </div>
               
-              <Button type="submit" className="w-full">
-                Enviar Denúncia
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Enviando..." : "Enviar Denúncia"}
               </Button>
             </form>
           </div>

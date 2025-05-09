@@ -15,6 +15,8 @@ import MyReports from "./pages/MyReports";
 import ReportDetail from "./pages/ReportDetail";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
+import Admin from "./pages/Admin";
+import MakeAdmin from "./pages/MakeAdmin";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +43,12 @@ const App = () => (
             } />
             <Route path="/report/:id" element={<ReportDetail />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <Admin />
+              </ProtectedRoute>
+            } />
+            <Route path="/make-admin" element={<MakeAdmin />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

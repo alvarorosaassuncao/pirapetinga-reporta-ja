@@ -1,5 +1,6 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ReportCard from "@/components/ReportCard";
@@ -7,48 +8,83 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-
-// Dados de exemplo
-const mockReports = [
-  {
-    id: "1",
-    title: "Buraco na calçada",
-    description: "Há um buraco grande na calçada que está causando acidentes com pedestres.",
-    category: "Calçadas e Vias",
-    location: "Rua das Flores, 123",
-    status: "pending" as const,
-    date: "22/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1615729947596-a598e5de0ab3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  },
-  {
-    id: "2",
-    title: "Lâmpada queimada",
-    description: "Poste de iluminação com lâmpada queimada há mais de duas semanas.",
-    category: "Iluminação Pública",
-    location: "Av. Principal, 500",
-    status: "in-progress" as const,
-    date: "15/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  },
-  {
-    id: "3",
-    title: "Lixo acumulado",
-    description: "Lixo acumulado na esquina, atraindo animais e causando mau cheiro na vizinhança.",
-    category: "Limpeza Urbana",
-    location: "Rua dos Ipês, 78",
-    status: "resolved" as const,
-    date: "10/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  }
-];
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const MyReports = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("all");
+  
+  const {
+    data: reports,
+    isLoading,
+    error,
+    refetch
+  } = useQuery({
+    queryKey: ["reports", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("user_id", user.id);
+      
+      if (error) {
+        toast({
+          title: "Erro ao carregar denúncias",
+          description: error.message,
+          variant: "destructive"
+        });
+        throw error;
+      }
+      
+      return data || [];
+    },
+    enabled: !!user
+  });
+  
   const filterReports = (status?: string) => {
+    if (!reports) return [];
+    
     if (status && status !== "all") {
-      return mockReports.filter(report => report.status === status);
+      return reports.filter(report => report.status === status);
     }
-    return mockReports;
+    
+    return reports;
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow py-10 bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600">Carregando denúncias...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow py-10 bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">Erro ao carregar denúncias</h2>
+            <p className="text-gray-600 mb-4">Ocorreu um erro ao tentar carregar suas denúncias.</p>
+            <Button onClick={() => refetch()}>Tentar novamente</Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -72,7 +108,7 @@ const MyReports = () => {
             </Link>
           </div>
           
-          {mockReports.length === 0 ? (
+          {!reports || reports.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-10 text-center">
               <h2 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma denúncia encontrada</h2>
               <p className="text-gray-600 mb-6">
@@ -83,7 +119,7 @@ const MyReports = () => {
               </Link>
             </div>
           ) : (
-            <Tabs defaultValue="all">
+            <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="mb-6">
                 <TabsTrigger value="all">Todos</TabsTrigger>
                 <TabsTrigger value="pending">Pendentes</TabsTrigger>
@@ -102,8 +138,8 @@ const MyReports = () => {
                       category={report.category}
                       location={report.location}
                       status={report.status}
-                      date={report.date}
-                      imageUrl={report.imageUrl}
+                      date={new Date(report.created_at).toLocaleDateString()}
+                      imageUrl={report.image_url}
                     />
                   ))}
                 </div>
@@ -120,8 +156,8 @@ const MyReports = () => {
                       category={report.category}
                       location={report.location}
                       status={report.status}
-                      date={report.date}
-                      imageUrl={report.imageUrl}
+                      date={new Date(report.created_at).toLocaleDateString()}
+                      imageUrl={report.image_url}
                     />
                   ))}
                 </div>
@@ -138,8 +174,8 @@ const MyReports = () => {
                       category={report.category}
                       location={report.location}
                       status={report.status}
-                      date={report.date}
-                      imageUrl={report.imageUrl}
+                      date={new Date(report.created_at).toLocaleDateString()}
+                      imageUrl={report.image_url}
                     />
                   ))}
                 </div>
@@ -156,8 +192,8 @@ const MyReports = () => {
                       category={report.category}
                       location={report.location}
                       status={report.status}
-                      date={report.date}
-                      imageUrl={report.imageUrl}
+                      date={new Date(report.created_at).toLocaleDateString()}
+                      imageUrl={report.image_url}
                     />
                   ))}
                 </div>

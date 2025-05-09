@@ -1,67 +1,71 @@
 
-import { useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Calendar, MapPin } from "lucide-react";
-import { Link } from "react-router-dom";
-
-// Dados de exemplo
-const mockReports = [
-  {
-    id: "1",
-    title: "Buraco na calçada",
-    description: "Há um buraco grande na calçada que está causando acidentes com pedestres.",
-    category: "Calçadas e Vias",
-    location: "Rua das Flores, 123",
-    status: "pending" as const,
-    date: "22/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1615729947596-a598e5de0ab3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  },
-  {
-    id: "2",
-    title: "Lâmpada queimada",
-    description: "Poste de iluminação com lâmpada queimada há mais de duas semanas.",
-    category: "Iluminação Pública",
-    location: "Av. Principal, 500",
-    status: "in-progress" as const,
-    date: "15/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  },
-  {
-    id: "3",
-    title: "Lixo acumulado",
-    description: "Lixo acumulado na esquina, atraindo animais e causando mau cheiro na vizinhança.",
-    category: "Limpeza Urbana",
-    location: "Rua dos Ipês, 78",
-    status: "resolved" as const,
-    date: "10/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 const ReportDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const [report, setReport] = useState<any>(null);
+  const { toast } = useToast();
+  const { user } = useAuth();
 
-  useEffect(() => {
-    // Simular busca no banco de dados
-    const foundReport = mockReports.find(report => report.id === id);
-    if (foundReport) {
-      setReport(foundReport);
+  const { data: report, isLoading, error } = useQuery({
+    queryKey: ["report", id],
+    queryFn: async () => {
+      if (!id) return null;
+      
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("id", id)
+        .single();
+      
+      if (error) {
+        if (error.code === "PGRST116") {
+          return null; // Not found
+        }
+        
+        toast({
+          title: "Erro ao carregar denúncia",
+          description: error.message,
+          variant: "destructive",
+        });
+        
+        throw error;
+      }
+      
+      return data;
     }
-  }, [id]);
+  });
 
-  if (!report) {
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow py-10 bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600">Carregando detalhes da denúncia...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !report) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar />
         <main className="flex-grow py-10 bg-gray-50 flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-700">Denúncia não encontrada</h2>
-            <p className="mt-2 text-gray-600">A denúncia que você está procurando não existe.</p>
+            <p className="mt-2 text-gray-600">A denúncia que você está procurando não existe ou você não tem permissão para visualizá-la.</p>
             <Link to="/my-reports">
               <Button className="mt-4">Voltar para Minhas Denúncias</Button>
             </Link>
@@ -71,6 +75,8 @@ const ReportDetail = () => {
       </div>
     );
   }
+
+  const formattedDate = new Date(report.created_at).toLocaleDateString();
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -88,7 +94,7 @@ const ReportDetail = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
             <div className="h-64 w-full relative">
               <img 
-                src={report.imageUrl} 
+                src={report.image_url || "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"} 
                 alt={report.title}
                 className="w-full h-full object-cover"
               />
@@ -121,7 +127,7 @@ const ReportDetail = () => {
                   <h2 className="text-lg font-medium mb-2">Data da Denúncia</h2>
                   <div className="flex items-center text-gray-700">
                     <Calendar className="h-5 w-5 mr-2 text-gray-400" />
-                    {report.date}
+                    {formattedDate}
                   </div>
                 </div>
               </div>
@@ -141,10 +147,16 @@ const ReportDetail = () => {
                       Sua denúncia está sendo analisada pela equipe responsável.
                     </p>
                   </div>
-                ) : (
+                ) : report.status === "resolved" ? (
                   <div className="bg-green-50 p-4 rounded-md">
                     <p className="text-green-800">
                       O problema reportado foi resolvido. Obrigado por contribuir com a melhoria da cidade!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-red-50 p-4 rounded-md">
+                    <p className="text-red-800">
+                      Sua denúncia foi rejeitada. Por favor, entre em contato com a prefeitura para mais informações.
                     </p>
                   </div>
                 )}
