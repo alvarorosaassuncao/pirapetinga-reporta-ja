@@ -1,19 +1,43 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { 
   Menu,
   MapPin, 
   List,
-  User
+  User,
+  LogOut
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Logout realizado com sucesso",
+        description: "Você foi desconectado da sua conta."
+      });
+      navigate("/");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+    
+    // Close the mobile menu after signing out
+    if (isMenuOpen) {
+      setIsMenuOpen(false);
+    }
   };
 
   return (
@@ -38,14 +62,31 @@ const Navbar = () => {
             <Link to="/my-reports" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md font-medium">
               Minhas Denúncias
             </Link>
-            <div className="ml-2">
-              <Link to="/login">
-                <Button variant="outline" className="mr-2">Entrar</Button>
-              </Link>
-              <Link to="/register">
-                <Button className="bg-primary hover:bg-primary-700">Cadastrar</Button>
-              </Link>
-            </div>
+            
+            {user ? (
+              <div className="flex items-center ml-2">
+                <span className="text-gray-700 mr-4">
+                  Olá, {user.user_metadata?.name || user.email?.split('@')[0]}
+                </span>
+                <Button 
+                  variant="outline" 
+                  onClick={handleSignOut} 
+                  className="flex items-center"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </Button>
+              </div>
+            ) : (
+              <div className="ml-2">
+                <Link to="/login">
+                  <Button variant="outline" className="mr-2">Entrar</Button>
+                </Link>
+                <Link to="/register">
+                  <Button className="bg-primary hover:bg-primary-700">Cadastrar</Button>
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -82,14 +123,31 @@ const Navbar = () => {
             >
               Minhas Denúncias
             </Link>
-            <div className="pt-2 pb-1 flex space-x-2">
-              <Link to="/login" className="w-1/2" onClick={toggleMenu}>
-                <Button variant="outline" className="w-full">Entrar</Button>
-              </Link>
-              <Link to="/register" className="w-1/2" onClick={toggleMenu}>
-                <Button className="w-full bg-primary hover:bg-primary-700">Cadastrar</Button>
-              </Link>
-            </div>
+
+            {user ? (
+              <div className="pt-2 pb-1">
+                <div className="px-3 py-2 text-base font-medium text-gray-700">
+                  Olá, {user.user_metadata?.name || user.email?.split('@')[0]}
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={handleSignOut} 
+                  className="mt-2 w-full flex items-center"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </Button>
+              </div>
+            ) : (
+              <div className="pt-2 pb-1 flex space-x-2">
+                <Link to="/login" className="w-1/2" onClick={toggleMenu}>
+                  <Button variant="outline" className="w-full">Entrar</Button>
+                </Link>
+                <Link to="/register" className="w-1/2" onClick={toggleMenu}>
+                  <Button className="w-full bg-primary hover:bg-primary-700">Cadastrar</Button>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

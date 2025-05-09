@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,39 +9,37 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Separator } from "@/components/ui/separator";
 import { Mail } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const Login = () => {
+  const { signIn, signInWithGoogle } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Get the path the user was trying to access before being redirected to login
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
-      // Simular login
-      console.log("Login attempt with:", { email, password });
-      
-      // Simulando um atraso de rede
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      // Simulando autenticação bem-sucedida
+      await signIn(email, password);
       toast({
         title: "Login realizado com sucesso!",
-        description: "Redirecionando para a página inicial...",
+        description: "Redirecionando...",
       });
       
-      // Redirecionar para a página inicial (em uma implementação real)
-      navigate("/");
+      // Redirect the user back to where they were trying to go
+      navigate(from, { replace: true });
     } catch (error) {
-      toast({
-        title: "Erro ao fazer login",
-        description: "Verifique suas credenciais e tente novamente.",
-        variant: "destructive",
-      });
+      // Error is already handled in signIn function
+      console.error("Login error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -51,22 +49,15 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // Simulando login com Google
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
+      await signInWithGoogle();
+      // The redirect is handled by Supabase, but we'll show a toast anyway
       toast({
-        title: "Login com Google realizado com sucesso!",
-        description: "Redirecionando para a página inicial...",
+        title: "Redirecionando para autenticação do Google",
+        description: "Por favor, aguarde...",
       });
-      
-      // Redirecionar para a página inicial
-      navigate("/");
     } catch (error) {
-      toast({
-        title: "Erro ao fazer login com Google",
-        description: "Tente novamente mais tarde.",
-        variant: "destructive",
-      });
+      // Error is already handled in signInWithGoogle function
+      console.error("Google login error:", error);
     } finally {
       setIsLoading(false);
     }

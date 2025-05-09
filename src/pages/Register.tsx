@@ -10,10 +10,13 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Separator } from "@/components/ui/separator";
 import { Mail } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const Register = () => {
+  const { signUp, signInWithGoogle } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,26 +48,13 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      // Simular registro
-      console.log("Registration attempt with:", { name, email, password });
+      await signUp(email, password, name);
       
-      // Simulando um atraso de rede
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      // Simulando registro bem-sucedido
-      toast({
-        title: "Cadastro realizado com sucesso!",
-        description: "Você já pode fazer login com suas credenciais.",
-      });
-      
-      // Redirecionar para a página de login
+      // Navigate to login page after successful registration
       navigate("/login");
     } catch (error) {
-      toast({
-        title: "Erro ao criar conta",
-        description: "Ocorreu um erro ao tentar criar sua conta. Tente novamente.",
-        variant: "destructive",
-      });
+      // Error is already handled in signUp function
+      console.error("Registration error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -74,22 +64,15 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      // Simulando registro com Google
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
+      await signInWithGoogle();
+      // The redirect is handled by Supabase, but we'll show a toast anyway
       toast({
-        title: "Cadastro com Google realizado com sucesso!",
-        description: "Redirecionando para a página inicial...",
+        title: "Redirecionando para autenticação do Google",
+        description: "Por favor, aguarde...",
       });
-      
-      // Redirecionar para a página inicial
-      navigate("/");
     } catch (error) {
-      toast({
-        title: "Erro ao cadastrar com Google",
-        description: "Tente novamente mais tarde.",
-        variant: "destructive",
-      });
+      // Error is already handled in signInWithGoogle function
+      console.error("Google signup error:", error);
     } finally {
       setIsLoading(false);
     }
