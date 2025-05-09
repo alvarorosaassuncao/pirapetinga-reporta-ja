@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
+import { ReportStatus } from "@/types/report";
 
 const Admin = () => {
   const { user } = useAuth();
@@ -104,7 +105,7 @@ const Admin = () => {
     enabled: !!user && isAdmin
   });
 
-  const updateReportStatus = async (reportId: string, newStatus: string) => {
+  const updateReportStatus = async (reportId: string, newStatus: ReportStatus) => {
     try {
       const { error } = await supabase
         .from("reports")
@@ -240,12 +241,12 @@ const Admin = () => {
                         <TableCell>{report.location}</TableCell>
                         <TableCell>{new Date(report.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <StatusBadge status={report.status} />
+                          <StatusBadge status={report.status as ReportStatus} />
                         </TableCell>
                         <TableCell className="text-right">
                           <Select
                             value={report.status}
-                            onValueChange={(value) => updateReportStatus(report.id, value)}
+                            onValueChange={(value) => updateReportStatus(report.id, value as ReportStatus)}
                           >
                             <SelectTrigger className="w-[130px]">
                               <SelectValue placeholder="Alterar status" />

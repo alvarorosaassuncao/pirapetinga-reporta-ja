@@ -1,131 +1,105 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 const MakeAdmin = () => {
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  
   const [email, setEmail] = useState("");
-  const [secretKey, setSecretKey] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Secret key for making an admin - for simplicity using "admin123"
-  // In a real app, this would be securely stored in an environment variable
-  const ADMIN_SECRET = "admin123";
-  
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    
+    setLoading(true);
+    setResult(null);
+
     try {
-      if (secretKey !== ADMIN_SECRET) {
-        throw new Error("A chave secreta está incorreta.");
+      // First get the user ID from the email
+      const { data: userData, error: userError } = await supabase.rpc(
+        "get_user_id_by_email",
+        { email: email }
+      );
+
+      if (userError) throw userError;
+      
+      if (!userData) {
+        setResult(`Nenhum usuário encontrado com o email ${email}`);
+        setLoading(false);
+        return;
       }
+
+      const userId = userData;
       
-      // Check if user exists in Supabase
-      const { data: userData, error: userError } = await supabase
-        .rpc('get_user_id_by_email', { email_input: email });
-      
-      if (userError) {
-        throw userError;
-      }
-      
-      if (!userData || !userData.length) {
-        throw new Error("Usuário não encontrado. Verifique o email.");
-      }
-      
-      const userId = userData[0].id;
-      
-      // Make user an admin
-      const { error } = await supabase
+      // Insert admin role
+      const { error: roleError } = await supabase
         .from("user_roles")
         .insert({
           user_id: userId,
           role: "admin"
         });
-      
-      if (error) {
-        if (error.code === "23505") { // Unique constraint violation
-          throw new Error("Este usuário já é um administrador.");
+
+      if (roleError) {
+        if (roleError.code === "23505") {
+          setResult(`O usuário ${email} já é um administrador.`);
+        } else {
+          throw roleError;
         }
-        throw error;
+      } else {
+        setResult(`Sucesso! O usuário ${email} agora é um administrador.`);
       }
-      
-      toast({
-        title: "Sucesso!",
-        description: `O usuário com email ${email} agora é um administrador.`,
-      });
-      
-      setEmail("");
-      setSecretKey("");
-      
     } catch (error: any) {
+      console.error("Error making admin:", error);
       toast({
         title: "Erro",
-        description: error.message || "Ocorreu um erro ao tentar adicionar o administrador.",
+        description: error.message || "Ocorreu um erro ao tentar conceder permissões de administrador.",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
-  
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
       
       <main className="flex-grow py-10 bg-gray-50">
         <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white p-6 sm:p-8 shadow-sm rounded-lg border border-gray-100">
-            <div className="mb-6 text-center">
-              <h1 className="text-2xl font-bold text-gray-900">Adicionar Administrador</h1>
-              <p className="mt-2 text-gray-600">
-                Adicione um usuário como administrador do sistema.
-              </p>
-            </div>
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+            <h1 className="text-2xl font-bold mb-6">Adicionar Administrador</h1>
             
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email do Usuário</Label>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email do usuário
+                </label>
                 <Input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@exemplo.com"
+                  placeholder="usuario@exemplo.com"
                   required
                 />
+                <p className="mt-1 text-sm text-gray-500">
+                  O usuário deve já estar registrado no sistema.
+                </p>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="secretKey">Chave Secreta</Label>
-                <Input
-                  id="secretKey"
-                  type="password"
-                  value={secretKey}
-                  onChange={(e) => setSecretKey(e.target.value)}
-                  placeholder="Digite a chave secreta"
-                  required
-                />
-              </div>
-              
-              <Button 
-                type="submit" 
-                className="w-full"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Processando..." : "Adicionar Administrador"}
+              <Button type="submit" disabled={loading}>
+                {loading ? "Processando..." : "Tornar Administrador"}
               </Button>
+              
+              {result && (
+                <div className={`p-3 rounded-md mt-4 ${result.includes("Sucesso") ? "bg-green-50 text-green-800" : "bg-yellow-50 text-yellow-800"}`}>
+                  {result}
+                </div>
+              )}
             </form>
           </div>
         </div>

@@ -93,11 +93,33 @@ export type Database = {
         }
         Relationships: []
       }
+      "usuario admin": {
+        Row: {
+          created_at: string | null
+          id: number
+          nome: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          nome: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          nome?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_user_id_by_email: {
+        Args: { email: string }
+        Returns: string
+      }
       is_admin: {
         Args: { user_id: string }
         Returns: boolean

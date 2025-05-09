@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -114,7 +113,7 @@ const ReportProblem = () => {
           description,
           category: categoryName,
           location: location.address,
-          status: "pending",
+          status: "pending" as ReportStatus,
           // We'll update this later if there are images
           image_url: previewImages.length > 0 ? null : undefined,
         })

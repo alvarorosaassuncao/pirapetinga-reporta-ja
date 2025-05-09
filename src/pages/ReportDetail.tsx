@@ -9,6 +9,7 @@ import { ArrowLeft, Calendar, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { ReportStatus } from "@/types/report";
 
 const ReportDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -99,7 +100,7 @@ const ReportDetail = () => {
                 className="w-full h-full object-cover"
               />
               <div className="absolute top-4 right-4">
-                <StatusBadge status={report.status} />
+                <StatusBadge status={report.status as ReportStatus} />
               </div>
             </div>
             
