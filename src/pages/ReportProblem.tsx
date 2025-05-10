@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -6,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, Upload } from "lucide-react";
+import { Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import CategorySelector from "@/components/CategorySelector";
 import LocationPicker from "@/components/LocationPicker";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { ReportStatus } from "@/types/report";
 
 const categories = [
   { id: "streets", name: "Calçadas e Vias", icon: "🛣️" },
