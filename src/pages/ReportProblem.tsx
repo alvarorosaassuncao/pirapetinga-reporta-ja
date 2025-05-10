@@ -106,7 +106,7 @@ const ReportProblem = () => {
       // Prepare category name
       const categoryName = categories.find(c => c.id === selectedCategory)?.name || selectedCategory;
       
-      // First insert the report
+      // Direct insertion without any user_roles checks
       const { data: reportData, error: reportError } = await supabase
         .from("reports")
         .insert({
@@ -116,7 +116,6 @@ const ReportProblem = () => {
           category: categoryName,
           location: location.address,
           status: "pending" as ReportStatus,
-          // We'll update this later if there are images
           image_url: previewImages.length > 0 ? null : undefined,
         })
         .select()
@@ -148,6 +147,7 @@ const ReportProblem = () => {
       }, 1500);
       
     } catch (error: any) {
+      console.error("Error submitting report:", error);
       toast({
         title: "Erro ao enviar denúncia",
         description: error.message || "Ocorreu um erro ao tentar enviar sua denúncia. Tente novamente.",
