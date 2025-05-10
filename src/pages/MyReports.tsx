@@ -28,21 +28,27 @@ const MyReports = () => {
     queryFn: async () => {
       if (!user) return [];
       
-      const { data, error } = await supabase
-        .from("reports")
-        .select("*")
-        .eq("user_id", user.id);
-      
-      if (error) {
-        toast({
-          title: "Erro ao carregar denúncias",
-          description: error.message,
-          variant: "destructive"
-        });
+      try {
+        const { data, error } = await supabase
+          .from("reports")
+          .select("*")
+          .eq("user_id", user.id);
+        
+        if (error) {
+          console.error("Error fetching reports:", error);
+          toast({
+            title: "Erro ao carregar denúncias",
+            description: error.message,
+            variant: "destructive"
+          });
+          throw error;
+        }
+        
+        return data || [];
+      } catch (error) {
+        console.error("Error in query function:", error);
         throw error;
       }
-      
-      return data || [];
     },
     enabled: !!user
   });

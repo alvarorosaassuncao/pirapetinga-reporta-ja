@@ -20,20 +20,20 @@ const MakeAdmin = () => {
 
     try {
       // First get the user ID from the email
-      const { data: userData, error: userError } = await supabase.rpc(
+      const { data, error: userError } = await supabase.rpc(
         "get_user_id_by_email",
-        { email: email }
+        { email_input: email }
       );
 
       if (userError) throw userError;
       
-      if (!userData) {
+      if (!data) {
         setResult(`Nenhum usuário encontrado com o email ${email}`);
         setLoading(false);
         return;
       }
 
-      const userId = userData;
+      const userId = data;
       
       // Insert admin role
       const { error: roleError } = await supabase

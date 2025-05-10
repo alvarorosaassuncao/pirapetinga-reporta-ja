@@ -117,7 +117,7 @@ export type Database = {
     }
     Functions: {
       get_user_id_by_email: {
-        Args: { email: string }
+        Args: { email_input: string }
         Returns: string
       }
       is_admin: {

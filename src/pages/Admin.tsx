@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -37,38 +36,47 @@ const Admin = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
 
   // Check if user is admin
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!user) return;
       
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin")
-        .single();
-      
-      if (error && error.code !== "PGRST116") {
-        toast({
-          title: "Erro",
-          description: "Não foi possível verificar suas permissões",
-          variant: "destructive"
-        });
-        navigate("/");
-        return;
-      }
-      
-      if (data) {
-        setIsAdmin(true);
-      } else {
-        toast({
-          title: "Acesso negado",
-          description: "Você não tem permissão para acessar esta página",
-          variant: "destructive"
-        });
-        navigate("/");
+      try {
+        setIsCheckingAdmin(true);
+        const { data, error } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "admin")
+          .single();
+        
+        if (error && error.code !== "PGRST116") {
+          console.error("Error checking admin status:", error);
+          toast({
+            title: "Erro",
+            description: "Não foi possível verificar suas permissões",
+            variant: "destructive"
+          });
+          navigate("/");
+          return;
+        }
+        
+        if (data) {
+          setIsAdmin(true);
+        } else {
+          toast({
+            title: "Acesso negado",
+            description: "Você não tem permissão para acessar esta página",
+            variant: "destructive"
+          });
+          navigate("/");
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+      } finally {
+        setIsCheckingAdmin(false);
       }
     };
     
@@ -92,6 +100,7 @@ const Admin = () => {
         .order("created_at", { ascending: false });
       
       if (error) {
+        console.error("Error fetching reports:", error);
         toast({
           title: "Erro ao carregar denúncias",
           description: error.message,
@@ -102,7 +111,7 @@ const Admin = () => {
       
       return data || [];
     },
-    enabled: !!user && isAdmin
+    enabled: !!user && isAdmin && !isCheckingAdmin
   });
 
   const updateReportStatus = async (reportId: string, newStatus: ReportStatus) => {
@@ -121,6 +130,7 @@ const Admin = () => {
       
       refetch();
     } catch (error: any) {
+      console.error("Error updating report status:", error);
       toast({
         title: "Erro",
         description: error.message || "Erro ao atualizar status da denúncia",
@@ -153,7 +163,7 @@ const Admin = () => {
     return filtered;
   };
 
-  if (!isAdmin) {
+  if (isCheckingAdmin || !user) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar />
@@ -212,7 +222,7 @@ const Admin = () => {
                 <p className="text-red-500">Erro ao carregar denúncias</p>
                 <Button onClick={() => refetch()} className="mt-2">Tentar novamente</Button>
               </div>
-            ) : filterReports().length === 0 ? (
+            ) : !reports || reports.length === 0 ? (
               <div className="text-center py-8">
                 <p>Nenhuma denúncia encontrada.</p>
               </div>
