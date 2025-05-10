@@ -124,9 +124,7 @@ const ReportProblem = () => {
       
       if (reportError) throw reportError;
       
-      // If there are images, upload the first one to Supabase Storage
-      // Note: For a production app, you would want to create a storage bucket for this
-      // In this demo we'll use a placeholder URL instead
+      // Use a placeholder URL for now since we're not actually uploading images in this demo
       let imageUrl = "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80";
       
       // Update the report with the image URL if there is one

@@ -8,9 +8,9 @@ AS $$
 DECLARE
   user_id UUID;
 BEGIN
-  SELECT auth.users.id INTO user_id
+  SELECT id INTO user_id
   FROM auth.users 
-  WHERE auth.users.email = email_input;
+  WHERE email = email_input;
   
   RETURN user_id;
 END;
