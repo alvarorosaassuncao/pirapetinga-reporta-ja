@@ -61,6 +61,37 @@ const ReportProblem = () => {
     setPreviewImages(updatedPreviews);
   };
   
+  // Função para fazer o upload de uma imagem para o Supabase Storage
+  const uploadImage = async (file: File) => {
+    try {
+      // Criar um nome de arquivo único usando timestamp e nome original
+      const timestamp = new Date().getTime();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${timestamp}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `${user?.id}/${fileName}`;
+      
+      // Upload do arquivo para o bucket "denuncias"
+      const { data, error } = await supabase.storage
+        .from("denuncias")
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) throw error;
+      
+      // Construir URL pública para a imagem
+      const { data: publicURL } = supabase.storage
+        .from("denuncias")
+        .getPublicUrl(filePath);
+      
+      return publicURL.publicUrl;
+    } catch (error: any) {
+      console.error("Erro ao fazer upload da imagem:", error);
+      throw error;
+    }
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -106,6 +137,23 @@ const ReportProblem = () => {
       // Prepare category name
       const categoryName = categories.find(c => c.id === selectedCategory)?.name || selectedCategory;
       
+      let imageUrl = null;
+      
+      // Se há imagens, fazer o upload da primeira imagem
+      if (images.length > 0) {
+        try {
+          imageUrl = await uploadImage(images[0]);
+          console.log("Imagem enviada com sucesso:", imageUrl);
+        } catch (error) {
+          console.error("Erro no upload da imagem:", error);
+          toast({
+            title: "Erro no upload da imagem",
+            description: "Ocorreu um erro ao enviar a imagem, mas tentaremos salvar sua denúncia.",
+            variant: "destructive",
+          });
+        }
+      }
+      
       // Direct insertion without any user_roles checks
       const { data: reportData, error: reportError } = await supabase
         .from("reports")
@@ -116,25 +164,12 @@ const ReportProblem = () => {
           category: categoryName,
           location: location.address,
           status: "pending" as ReportStatus,
-          image_url: previewImages.length > 0 ? null : undefined,
+          image_url: imageUrl,
         })
         .select()
         .single();
       
       if (reportError) throw reportError;
-      
-      // Use a placeholder URL for now since we're not actually uploading images in this demo
-      let imageUrl = "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80";
-      
-      // Update the report with the image URL if there is one
-      if (previewImages.length > 0) {
-        const { error: updateError } = await supabase
-          .from("reports")
-          .update({ image_url: imageUrl })
-          .eq("id", reportData.id);
-        
-        if (updateError) throw updateError;
-      }
       
       toast({
         title: "Denúncia enviada com sucesso!",
