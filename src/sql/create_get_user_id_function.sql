@@ -12,3 +12,4 @@ BEGIN
   WHERE auth.users.email = email_input;
 END;
 $$;
+
