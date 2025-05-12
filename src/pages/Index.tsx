@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Hero from "@/components/Hero";
@@ -8,56 +8,50 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, MapPin } from "lucide-react";
-
-// Dados de exemplo
-const mockReports = [
-  {
-    id: "1",
-    title: "Buraco na calçada",
-    description: "Há um buraco grande na calçada que está causando acidentes com pedestres, especialmente à noite quando a visibilidade é baixa.",
-    category: "Calçadas e Vias",
-    location: "Rua das Flores, 123",
-    status: "pending" as const,
-    date: "22/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1615729947596-a598e5de0ab3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  },
-  {
-    id: "2",
-    title: "Lâmpada queimada",
-    description: "Poste de iluminação com lâmpada queimada há mais de duas semanas, deixando a rua muito escura e perigosa.",
-    category: "Iluminação Pública",
-    location: "Av. Principal, 500",
-    status: "in-progress" as const,
-    date: "15/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  },
-  {
-    id: "3",
-    title: "Lixo acumulado",
-    description: "Lixo acumulado na esquina, atraindo animais e causando mau cheiro na vizinhança. Coleta não passa há dias.",
-    category: "Limpeza Urbana",
-    location: "Rua dos Ipês, 78",
-    status: "resolved" as const,
-    date: "10/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  },
-  {
-    id: "4",
-    title: "Sinalização danificada",
-    description: "Placa de 'Pare' caída no chão após ventos fortes, causando confusão no trânsito e situações perigosas.",
-    category: "Sinalização",
-    location: "Cruzamento das ruas A e B",
-    status: "rejected" as const,
-    date: "05/04/2023",
-    imageUrl: "https://images.unsplash.com/photo-1493397212122-2b85dda8106b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
+import { Report, ReportStatus } from "@/types/report";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { useToast } from "@/components/ui/use-toast";
 
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoading(true);
+        
+        const { data, error } = await supabase
+          .from('reports')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          throw error;
+        }
+        
+        setReports(data || []);
+      } catch (error) {
+        console.error('Erro ao buscar denúncias:', error);
+        toast({
+          title: "Erro ao carregar denúncias",
+          description: "Não foi possível carregar as denúncias. Por favor, tente novamente mais tarde.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchReports();
+  }, [toast]);
   
   const filterReports = (status?: string) => {
-    let filtered = mockReports;
+    let filtered = reports;
     
     if (status && status !== "all") {
       filtered = filtered.filter(report => report.status === status);
@@ -66,13 +60,21 @@ const Index = () => {
     if (searchTerm) {
       filtered = filtered.filter(
         report => 
-          report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (report.title?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
           report.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
           report.location.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
     return filtered;
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), "dd/MM/yyyy", { locale: ptBR });
+    } catch (error) {
+      return "Data inválida";
+    }
   };
 
   return (
@@ -82,57 +84,12 @@ const Index = () => {
       <main>
         <Hero />
         
-        <section className="py-12 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-gray-900">Como funciona</h2>
-              <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-                Reportar problemas urbanos em Pirapetinga é simples e rápido.
-              </p>
-            </div>
-            
-            <div className="mt-10">
-              <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                  <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mb-4 mx-auto">
-                    <span className="text-primary font-bold">1</span>
-                  </div>
-                  <h3 className="text-xl font-medium text-gray-900 text-center">Identifique o problema</h3>
-                  <p className="mt-2 text-gray-600 text-center">
-                    Encontrou um problema na cidade? Fotografe e registre os detalhes.
-                  </p>
-                </div>
-                
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                  <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mb-4 mx-auto">
-                    <span className="text-primary font-bold">2</span>
-                  </div>
-                  <h3 className="text-xl font-medium text-gray-900 text-center">Envie sua denúncia</h3>
-                  <p className="mt-2 text-gray-600 text-center">
-                    Use nosso app para enviar a localização exata e detalhes do problema.
-                  </p>
-                </div>
-                
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                  <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mb-4 mx-auto">
-                    <span className="text-primary font-bold">3</span>
-                  </div>
-                  <h3 className="text-xl font-medium text-gray-900 text-center">Acompanhe a solução</h3>
-                  <p className="mt-2 text-gray-600 text-center">
-                    Receba atualizações sobre o status do problema até sua resolução.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-        
         <section className="py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-gray-900">Problemas Reportados</h2>
+              <h2 className="text-3xl font-bold text-gray-900">Ocorrências em Pirapetinga</h2>
               <p className="mt-2 text-lg text-gray-600">
-                Confira as últimas denúncias da cidade e seu status de resolução.
+                Confira todas as denúncias da cidade para ficar por dentro do que está acontecendo.
               </p>
             </div>
             
@@ -166,77 +123,109 @@ const Index = () => {
                 <TabsTrigger value="resolved">Resolvidos</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="all" className="mt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterReports().map((report) => (
-                    <ReportCard
-                      key={report.id}
-                      id={report.id}
-                      title={report.title}
-                      description={report.description}
-                      category={report.category}
-                      location={report.location}
-                      status={report.status}
-                      date={report.date}
-                      imageUrl={report.imageUrl}
-                    />
-                  ))}
+              {loading ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="pending" className="mt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterReports('pending').map((report) => (
-                    <ReportCard
-                      key={report.id}
-                      id={report.id}
-                      title={report.title}
-                      description={report.description}
-                      category={report.category}
-                      location={report.location}
-                      status={report.status}
-                      date={report.date}
-                      imageUrl={report.imageUrl}
-                    />
-                  ))}
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="in-progress" className="mt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterReports('in-progress').map((report) => (
-                    <ReportCard
-                      key={report.id}
-                      id={report.id}
-                      title={report.title}
-                      description={report.description}
-                      category={report.category}
-                      location={report.location}
-                      status={report.status}
-                      date={report.date}
-                      imageUrl={report.imageUrl}
-                    />
-                  ))}
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="resolved" className="mt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterReports('resolved').map((report) => (
-                    <ReportCard
-                      key={report.id}
-                      id={report.id}
-                      title={report.title}
-                      description={report.description}
-                      category={report.category}
-                      location={report.location}
-                      status={report.status}
-                      date={report.date}
-                      imageUrl={report.imageUrl}
-                    />
-                  ))}
-                </div>
-              </TabsContent>
+              ) : (
+                <>
+                  <TabsContent value="all" className="mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filterReports().length > 0 ? (
+                        filterReports().map((report) => (
+                          <ReportCard
+                            key={report.id}
+                            id={report.id}
+                            title={report.title || "Sem título"}
+                            description={report.description}
+                            category={report.category}
+                            location={report.location}
+                            status={report.status as ReportStatus || "pending"}
+                            date={formatDate(report.created_at)}
+                            imageUrl={report.image_url || undefined}
+                          />
+                        ))
+                      ) : (
+                        <div className="col-span-3 text-center py-10">
+                          <p className="text-gray-500">Nenhuma denúncia encontrada</p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="pending" className="mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filterReports('pending').length > 0 ? (
+                        filterReports('pending').map((report) => (
+                          <ReportCard
+                            key={report.id}
+                            id={report.id}
+                            title={report.title || "Sem título"}
+                            description={report.description}
+                            category={report.category}
+                            location={report.location}
+                            status={report.status as ReportStatus || "pending"}
+                            date={formatDate(report.created_at)}
+                            imageUrl={report.image_url || undefined}
+                          />
+                        ))
+                      ) : (
+                        <div className="col-span-3 text-center py-10">
+                          <p className="text-gray-500">Nenhuma denúncia pendente encontrada</p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="in-progress" className="mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filterReports('in-progress').length > 0 ? (
+                        filterReports('in-progress').map((report) => (
+                          <ReportCard
+                            key={report.id}
+                            id={report.id}
+                            title={report.title || "Sem título"}
+                            description={report.description}
+                            category={report.category}
+                            location={report.location}
+                            status={report.status as ReportStatus || "pending"}
+                            date={formatDate(report.created_at)}
+                            imageUrl={report.image_url || undefined}
+                          />
+                        ))
+                      ) : (
+                        <div className="col-span-3 text-center py-10">
+                          <p className="text-gray-500">Nenhuma denúncia em análise encontrada</p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="resolved" className="mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filterReports('resolved').length > 0 ? (
+                        filterReports('resolved').map((report) => (
+                          <ReportCard
+                            key={report.id}
+                            id={report.id}
+                            title={report.title || "Sem título"}
+                            description={report.description}
+                            category={report.category}
+                            location={report.location}
+                            status={report.status as ReportStatus || "pending"}
+                            date={formatDate(report.created_at)}
+                            imageUrl={report.image_url || undefined}
+                          />
+                        ))
+                      ) : (
+                        <div className="col-span-3 text-center py-10">
+                          <p className="text-gray-500">Nenhuma denúncia resolvida encontrada</p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                </>
+              )}
             </Tabs>
           </div>
         </section>
