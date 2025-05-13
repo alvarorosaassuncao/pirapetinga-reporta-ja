@@ -38,6 +38,7 @@ const ReportProblem = () => {
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [location, setLocation] = useState<{ address: string; latitude: number; longitude: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -47,6 +48,7 @@ const ReportProblem = () => {
       setPreviewImages([...previewImages, ...newPreviewImages]);
       
       setImages([...images, ...filesArray]);
+      console.log("Images added:", filesArray.map(f => f.name));
     }
   };
   
@@ -70,6 +72,8 @@ const ReportProblem = () => {
       const fileName = `${timestamp}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       const filePath = `${user?.id}/${fileName}`;
       
+      console.log("Uploading file:", file.name, "to path:", filePath);
+      
       // Upload do arquivo para o bucket "denuncias"
       const { data, error } = await supabase.storage
         .from("denuncias")
@@ -78,13 +82,19 @@ const ReportProblem = () => {
           upsert: false
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Upload error:", error);
+        throw error;
+      }
+      
+      console.log("Upload successful, data:", data);
       
       // Construir URL pública para a imagem
       const { data: publicURL } = supabase.storage
         .from("denuncias")
         .getPublicUrl(filePath);
       
+      console.log("Public URL:", publicURL.publicUrl);
       return publicURL.publicUrl;
     } catch (error: any) {
       console.error("Erro ao fazer upload da imagem:", error);
@@ -132,6 +142,7 @@ const ReportProblem = () => {
     }
     
     setIsSubmitting(true);
+    setUploadProgress(10);
     
     try {
       // Prepare category name
@@ -142,8 +153,10 @@ const ReportProblem = () => {
       // Se há imagens, fazer o upload da primeira imagem
       if (images.length > 0) {
         try {
+          setUploadProgress(30);
           imageUrl = await uploadImage(images[0]);
           console.log("Imagem enviada com sucesso:", imageUrl);
+          setUploadProgress(70);
         } catch (error) {
           console.error("Erro no upload da imagem:", error);
           toast({
@@ -153,6 +166,8 @@ const ReportProblem = () => {
           });
         }
       }
+      
+      setUploadProgress(80);
       
       // Direct insertion without any user_roles checks
       const { data: reportData, error: reportError } = await supabase
@@ -168,6 +183,8 @@ const ReportProblem = () => {
         })
         .select()
         .single();
+      
+      setUploadProgress(100);
       
       if (reportError) throw reportError;
       
@@ -190,6 +207,7 @@ const ReportProblem = () => {
       });
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -283,6 +301,13 @@ const ReportProblem = () => {
                 <Label>Localização do Problema</Label>
                 <LocationPicker onSelectLocation={setLocation} />
               </div>
+              
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="bg-primary h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+                  <p className="text-xs text-gray-500 mt-1">Enviando... {uploadProgress}%</p>
+                </div>
+              )}
               
               <Button 
                 type="submit" 

@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Report, ReportStatus } from "@/types/report";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,7 +34,13 @@ const Index = () => {
           throw error;
         }
         
-        setReports(data || []);
+        // Convert status string to ReportStatus type
+        const typedReports = data?.map(report => ({
+          ...report,
+          status: report.status as ReportStatus
+        })) || [];
+        
+        setReports(typedReports);
       } catch (error) {
         console.error('Erro ao buscar denúncias:', error);
         toast({

@@ -25,14 +25,28 @@ const ReportCard = ({
   date,
   imageUrl
 }: ReportCardProps) => {
+  const hasValidImage = imageUrl && imageUrl.trim() !== '';
+
   return (
     <Card className="overflow-hidden card-hover">
       <div className="relative h-48 w-full">
-        <img 
-          src={imageUrl || "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"} 
-          alt={title}
-          className="w-full h-full object-cover"
-        />
+        {hasValidImage ? (
+          <img 
+            src={imageUrl} 
+            alt={title}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              console.error("Error loading card image:", imageUrl);
+              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80";
+            }}
+          />
+        ) : (
+          <img 
+            src="https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" 
+            alt="Imagem padrão"
+            className="w-full h-full object-cover"
+          />
+        )}
         <div className="absolute top-2 right-2">
           <StatusBadge status={status} />
         </div>

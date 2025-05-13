@@ -1,4 +1,3 @@
-
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
@@ -41,7 +40,14 @@ const ReportDetail = () => {
         throw error;
       }
       
-      return data;
+      if (data) {
+        console.log("Fetched report image URL:", data.image_url);
+      }
+      
+      return {
+        ...data,
+        status: data.status as ReportStatus
+      };
     }
   });
 
@@ -77,7 +83,8 @@ const ReportDetail = () => {
     );
   }
 
-  const formattedDate = new Date(report.created_at).toLocaleDateString();
+  const formattedDate = report ? new Date(report.created_at).toLocaleDateString() : '';
+  const hasImage = report?.image_url && report.image_url.trim() !== '';
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -92,78 +99,92 @@ const ReportDetail = () => {
             </Link>
           </div>
           
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-            <div className="h-64 w-full relative">
-              <img 
-                src={report.image_url || "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"} 
-                alt={report.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-4 right-4">
-                <StatusBadge status={report.status as ReportStatus} />
-              </div>
-            </div>
-            
-            <div className="p-6">
-              <div className="mb-6">
-                <p className="text-sm text-primary font-medium">{report.category}</p>
-                <h1 className="text-2xl font-bold mt-1">{report.title}</h1>
-              </div>
-              
-              <div className="mb-6">
-                <h2 className="text-lg font-medium mb-2">Descrição</h2>
-                <p className="text-gray-700">{report.description}</p>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h2 className="text-lg font-medium mb-2">Localização</h2>
-                  <div className="flex items-center text-gray-700">
-                    <MapPin className="h-5 w-5 mr-2 text-gray-400" />
-                    {report.location}
-                  </div>
-                </div>
-                
-                <div>
-                  <h2 className="text-lg font-medium mb-2">Data da Denúncia</h2>
-                  <div className="flex items-center text-gray-700">
-                    <Calendar className="h-5 w-5 mr-2 text-gray-400" />
-                    {formattedDate}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-8 border-t border-gray-100 pt-6">
-                <h2 className="text-lg font-medium mb-4">Atualizações</h2>
-                
-                {report.status === "pending" ? (
-                  <div className="bg-yellow-50 p-4 rounded-md">
-                    <p className="text-yellow-800">
-                      Sua denúncia foi recebida e está aguardando análise pela equipe responsável.
-                    </p>
-                  </div>
-                ) : report.status === "in-progress" ? (
-                  <div className="bg-blue-50 p-4 rounded-md">
-                    <p className="text-blue-800">
-                      Sua denúncia está sendo analisada pela equipe responsável.
-                    </p>
-                  </div>
-                ) : report.status === "resolved" ? (
-                  <div className="bg-green-50 p-4 rounded-md">
-                    <p className="text-green-800">
-                      O problema reportado foi resolvido. Obrigado por contribuir com a melhoria da cidade!
-                    </p>
-                  </div>
+          {report && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+              <div className="h-64 w-full relative">
+                {hasImage ? (
+                  <img 
+                    src={report.image_url} 
+                    alt={report.title || "Imagem da denúncia"}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error("Error loading image:", report.image_url);
+                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80";
+                    }}
+                  />
                 ) : (
-                  <div className="bg-red-50 p-4 rounded-md">
-                    <p className="text-red-800">
-                      Sua denúncia foi rejeitada. Por favor, entre em contato com a prefeitura para mais informações.
-                    </p>
-                  </div>
+                  <img 
+                    src="https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" 
+                    alt="Imagem padrão"
+                    className="w-full h-full object-cover"
+                  />
                 )}
+                <div className="absolute top-4 right-4">
+                  <StatusBadge status={report.status} />
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="mb-6">
+                  <p className="text-sm text-primary font-medium">{report.category}</p>
+                  <h1 className="text-2xl font-bold mt-1">{report.title}</h1>
+                </div>
+                
+                <div className="mb-6">
+                  <h2 className="text-lg font-medium mb-2">Descrição</h2>
+                  <p className="text-gray-700">{report.description}</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h2 className="text-lg font-medium mb-2">Localização</h2>
+                    <div className="flex items-center text-gray-700">
+                      <MapPin className="h-5 w-5 mr-2 text-gray-400" />
+                      {report.location}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h2 className="text-lg font-medium mb-2">Data da Denúncia</h2>
+                    <div className="flex items-center text-gray-700">
+                      <Calendar className="h-5 w-5 mr-2 text-gray-400" />
+                      {formattedDate}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-8 border-t border-gray-100 pt-6">
+                  <h2 className="text-lg font-medium mb-4">Atualizações</h2>
+                  
+                  {report.status === "pending" ? (
+                    <div className="bg-yellow-50 p-4 rounded-md">
+                      <p className="text-yellow-800">
+                        Sua denúncia foi recebida e está aguardando análise pela equipe responsável.
+                      </p>
+                    </div>
+                  ) : report.status === "in-progress" ? (
+                    <div className="bg-blue-50 p-4 rounded-md">
+                      <p className="text-blue-800">
+                        Sua denúncia está sendo analisada pela equipe responsável.
+                      </p>
+                    </div>
+                  ) : report.status === "resolved" ? (
+                    <div className="bg-green-50 p-4 rounded-md">
+                      <p className="text-green-800">
+                        O problema reportado foi resolvido. Obrigado por contribuir com a melhoria da cidade!
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-red-50 p-4 rounded-md">
+                      <p className="text-red-800">
+                        Sua denúncia foi rejeitada. Por favor, entre em contato com a prefeitura para mais informações.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
       
