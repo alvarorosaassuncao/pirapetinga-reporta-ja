@@ -3,27 +3,97 @@ import { useState, useRef, useEffect } from "react";
 import { MapPin, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface LocationPickerProps {
   onSelectLocation: (location: { address: string; latitude: number; longitude: number }) => void;
 }
 
+// Coordenadas aproximadas para Pirapetinga, MG, Brasil
+const PIRAPETINGA_COORDS = {
+  latitude: -21.6555,
+  longitude: -42.3422
+};
+
 const LocationPicker = ({ onSelectLocation }: LocationPickerProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<{ address: string; latitude: number; longitude: number } | null>(null);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const marker = useRef<mapboxgl.Marker | null>(null);
   
-  // This is a placeholder. In a real implementation, this would use a map API like Google Maps or Mapbox
-  const handleSearch = () => {
-    if (searchTerm.trim()) {
-      // Simulate finding a location in Pirapetinga
-      const mockLocation = {
-        address: `${searchTerm}, Pirapetinga, MG`,
-        latitude: -21.6555, // Example coordinates for Pirapetinga
-        longitude: -42.3422
+  // Inicializa o mapa quando o componente é montado
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    // Token público do Mapbox - em um ambiente de produção, guarde em uma variável de ambiente
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYXNyYWRldiIsImEiOiJjbHpuMnFranQwYXR0MmpueGVmYXR0OXMzIn0.KLrVVbYVqufV61jvMK0pOw';
+    
+    // Inicializa o mapa
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [PIRAPETINGA_COORDS.longitude, PIRAPETINGA_COORDS.latitude],
+      zoom: 13
+    });
+
+    // Adiciona controles de navegação
+    map.current.addControl(new mapboxgl.NavigationControl());
+    
+    // Cria um marcador inicial
+    marker.current = new mapboxgl.Marker({ draggable: true })
+      .setLngLat([PIRAPETINGA_COORDS.longitude, PIRAPETINGA_COORDS.latitude])
+      .addTo(map.current);
+
+    // Evento para quando o marcador é arrastado
+    marker.current.on('dragend', () => {
+      if (!marker.current) return;
+      const lngLat = marker.current.getLngLat();
+      
+      const newLocation = {
+        address: `Localização personalizada, Pirapetinga, MG`,
+        latitude: lngLat.lat,
+        longitude: lngLat.lng
       };
       
-      setSelectedLocation(mockLocation);
-      onSelectLocation(mockLocation);
+      setSelectedLocation(newLocation);
+      onSelectLocation(newLocation);
+      
+      console.log('Marcador movido para:', lngLat);
+    });
+
+    // Limpa quando o componente é desmontado
+    return () => {
+      map.current?.remove();
+    };
+  }, [onSelectLocation]);
+
+  // Função para buscar um endereço (simulada)
+  const handleSearch = () => {
+    if (searchTerm.trim()) {
+      // Simula uma busca e move o marcador para uma posição levemente diferente
+      // Em um ambiente real, aqui você usaria a API de geocodificação do Mapbox
+      const randomOffset = 0.003 * (Math.random() - 0.5);
+      
+      const searchLocation = {
+        address: `${searchTerm}, Pirapetinga, MG`,
+        latitude: PIRAPETINGA_COORDS.latitude + randomOffset,
+        longitude: PIRAPETINGA_COORDS.longitude + randomOffset
+      };
+      
+      // Atualiza o estado e move o marcador no mapa
+      setSelectedLocation(searchLocation);
+      onSelectLocation(searchLocation);
+      
+      if (map.current && marker.current) {
+        marker.current.setLngLat([searchLocation.longitude, searchLocation.latitude]);
+        map.current.flyTo({
+          center: [searchLocation.longitude, searchLocation.latitude],
+          zoom: 15,
+          essential: true
+        });
+      }
     }
   };
 
@@ -32,6 +102,32 @@ const LocationPicker = ({ onSelectLocation }: LocationPickerProps) => {
       handleSearch();
     }
   };
+
+  // Função para lidar com cliques no mapa
+  const handleMapClick = (e: mapboxgl.MapMouseEvent) => {
+    if (!map.current || !marker.current) return;
+    
+    const clickLocation = {
+      address: `Localização selecionada, Pirapetinga, MG`,
+      latitude: e.lngLat.lat,
+      longitude: e.lngLat.lng
+    };
+    
+    setSelectedLocation(clickLocation);
+    onSelectLocation(clickLocation);
+    marker.current.setLngLat([clickLocation.longitude, clickLocation.latitude]);
+  };
+
+  // Adiciona o listener de clique ao mapa após ele ser carregado
+  useEffect(() => {
+    if (!map.current) return;
+    
+    map.current.on('click', handleMapClick);
+    
+    return () => {
+      map.current?.off('click', handleMapClick);
+    };
+  }, [map.current, onSelectLocation]);
 
   return (
     <div className="w-full space-y-4">
@@ -65,11 +161,7 @@ const LocationPicker = ({ onSelectLocation }: LocationPickerProps) => {
         </div>
       )}
 
-      <div className="bg-gray-200 rounded-md w-full h-60 flex items-center justify-center">
-        <p className="text-gray-500">
-          Mapa será carregado aqui
-        </p>
-      </div>
+      <div ref={mapContainer} className="w-full h-60 rounded-md overflow-hidden border border-gray-200"></div>
 
       <p className="text-xs text-gray-500">
         Selecione um ponto no mapa ou busque um endereço para marcar a localização exata do problema.

@@ -68,18 +68,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      console.log("Iniciando login com Google...");
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         },
       });
 
-      if (error) throw error;
+      console.log("Resposta do login com Google:", { data, error });
+
+      if (error) {
+        console.error("Erro detalhado do login com Google:", error);
+        throw error;
+      }
     } catch (error: any) {
+      console.error("Exceção no login com Google:", error);
       toast({
         title: "Erro ao fazer login com Google",
-        description: error.message || "Tente novamente mais tarde.",
+        description: error.message || "Verifique sua conexão e tente novamente mais tarde.",
         variant: "destructive",
       });
       throw error;
