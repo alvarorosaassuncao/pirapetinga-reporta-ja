@@ -11,6 +11,7 @@ type AuthContextType = {
   signInWithGoogle: () => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
+  userName: string | null;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [userName, setUserName] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -26,6 +28,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Fetch user profile data including name
+          const { data } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (data) {
+            setUserName(data.name);
+          } else {
+            setUserName(session.user.user_metadata?.name || session.user.email?.split('@')[0] || null);
+          }
+        }
       } catch (error) {
         console.error("Error checking session:", error);
       } finally {
@@ -37,8 +54,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Fetch user profile data
+          const { data } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (data) {
+            setUserName(data.name);
+          } else {
+            setUserName(session.user.user_metadata?.name || session.user.email?.split('@')[0] || null);
+          }
+        } else {
+          setUserName(null);
+        }
+        
         setLoading(false);
       }
     );
@@ -142,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signIn, signInWithGoogle, signUp, signOut }}
+      value={{ user, loading, signIn, signInWithGoogle, signUp, signOut, userName }}
     >
       {children}
     </AuthContext.Provider>

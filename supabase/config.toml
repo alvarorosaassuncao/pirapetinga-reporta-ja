@@ -5,3 +5,4 @@ project_id = "mdpvxwxgytkrgprxotgn"
 enabled = true
 client_id = "seu_google_client_id"
 secret = "seu_google_secret"
+redirect_uri = "http://localhost:3000/auth/callback"

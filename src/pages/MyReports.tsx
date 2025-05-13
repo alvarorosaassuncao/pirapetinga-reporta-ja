@@ -51,6 +51,8 @@ const MyReports = () => {
             title: item.title,
             imageUrl: item.image_url
           })));
+        } else {
+          console.log("Nenhuma denúncia encontrada para o usuário", user.id);
         }
         
         return data || [];

@@ -1,10 +1,11 @@
+
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, MapPin } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -20,9 +21,15 @@ const ReportDetail = () => {
     queryFn: async () => {
       if (!id) return null;
       
+      // Consulta modificada para buscar também o nome do usuário que fez a denúncia
       const { data, error } = await supabase
         .from("reports")
-        .select("*")
+        .select(`
+          *,
+          profiles:user_id (
+            name
+          )
+        `)
         .eq("id", id)
         .single();
       
@@ -41,12 +48,13 @@ const ReportDetail = () => {
       }
       
       if (data) {
-        console.log("Fetched report image URL:", data.image_url);
+        console.log("Fetched report data:", data);
       }
       
       return {
         ...data,
-        status: data.status as ReportStatus
+        status: data.status as ReportStatus,
+        userName: data.profiles?.name || "Usuário Anônimo"
       };
     }
   });
@@ -150,6 +158,15 @@ const ReportDetail = () => {
                       <Calendar className="h-5 w-5 mr-2 text-gray-400" />
                       {formattedDate}
                     </div>
+                  </div>
+                </div>
+                
+                {/* Adicionando informação do usuário que fez a denúncia */}
+                <div className="mt-6">
+                  <h2 className="text-lg font-medium mb-2">Reportado por</h2>
+                  <div className="flex items-center text-gray-700">
+                    <User className="h-5 w-5 mr-2 text-gray-400" />
+                    {report.userName || "Usuário Anônimo"}
                   </div>
                 </div>
                 
