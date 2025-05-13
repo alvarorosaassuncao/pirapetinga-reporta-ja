@@ -1,107 +1,179 @@
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { 
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle 
+} from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const MakeAdmin = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setResult(null);
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [adminInfo, setAdminInfo] = useState<{name: string; email: string} | null>(null);
+  
+  const handleMakeAdmin = async () => {
+    if (!email) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um email válido",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
     try {
-      // First get the user ID from the email
-      const { data, error: userError } = await supabase.rpc(
-        "get_user_id_by_email",
-        { email_input: email }
-      );
-
-      if (userError) throw userError;
+      // Primeiro, buscar o ID do usuário pelo email
+      const { data: functionData, error: functionError } = await supabase
+        .rpc('get_user_id_by_email', { email_input: email });
       
-      if (!data) {
-        setResult(`Nenhum usuário encontrado com o email ${email}`);
-        setLoading(false);
+      if (functionError) throw functionError;
+      
+      if (!functionData) {
+        toast({
+          title: "Usuário não encontrado",
+          description: "Não foi possível encontrar um usuário com este email",
+          variant: "destructive"
+        });
+        setIsSubmitting(false);
         return;
       }
-
-      const userId = data;
       
-      // Insert admin role
-      const { error: roleError } = await supabase
-        .from("user_roles")
+      const userId = functionData;
+      
+      // Buscar o nome do perfil
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', userId)
+        .single();
+      
+      // Verificar se já é admin
+      const { data: existingRole } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .single();
+      
+      if (existingRole) {
+        toast({
+          title: "Este usuário já é um administrador",
+          description: "O usuário já possui privilégios de administrador",
+          variant: "default"
+        });
+        setAdminInfo({
+          name: profileData?.name || 'Usuário',
+          email: email
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Adicionar usuário como admin
+      const { error: insertError } = await supabase
+        .from('user_roles')
         .insert({
           user_id: userId,
-          role: "admin"
+          role: 'admin'
         });
-
-      if (roleError) {
-        if (roleError.code === "23505") {
-          setResult(`O usuário ${email} já é um administrador.`);
-        } else {
-          throw roleError;
-        }
-      } else {
-        setResult(`Sucesso! O usuário ${email} agora é um administrador.`);
-      }
+      
+      if (insertError) throw insertError;
+      
+      toast({
+        title: "Sucesso",
+        description: "Usuário promovido a administrador com sucesso",
+      });
+      
+      setAdminInfo({
+        name: profileData?.name || 'Usuário',
+        email: email
+      });
     } catch (error: any) {
       console.error("Error making admin:", error);
       toast({
         title: "Erro",
-        description: error.message || "Ocorreu um erro ao tentar conceder permissões de administrador.",
-        variant: "destructive",
+        description: error.message || "Ocorreu um erro ao adicionar o administrador",
+        variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
-
+  
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
       
       <main className="flex-grow py-10 bg-gray-50">
-        <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <h1 className="text-2xl font-bold mb-6">Adicionar Administrador</h1>
+        <div className="max-w-md mx-auto px-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Adicionar Administrador</CardTitle>
+              <CardDescription>
+                Adicione privilégios de administrador a um usuário existente.
+              </CardDescription>
+            </CardHeader>
             
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  Email do usuário
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@exemplo.com"
-                  required
-                />
-                <p className="mt-1 text-sm text-gray-500">
-                  O usuário deve já estar registrado no sistema.
-                </p>
-              </div>
-              
-              <Button type="submit" disabled={loading}>
-                {loading ? "Processando..." : "Tornar Administrador"}
-              </Button>
-              
-              {result && (
-                <div className={`p-3 rounded-md mt-4 ${result.includes("Sucesso") ? "bg-green-50 text-green-800" : "bg-yellow-50 text-yellow-800"}`}>
-                  {result}
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email do usuário
+                  </label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="email@exemplo.com"
+                  />
                 </div>
-              )}
-            </form>
-          </div>
+                
+                {adminInfo && (
+                  <Alert className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Administrador</AlertTitle>
+                    <AlertDescription>
+                      {adminInfo.name} ({adminInfo.email}) possui privilégios de administrador.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+            
+            <CardFooter className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={() => navigate("/")}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleMakeAdmin}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Processando..." : "Adicionar Admin"}
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       </main>
       
