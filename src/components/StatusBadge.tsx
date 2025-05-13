@@ -25,6 +25,13 @@ const statusConfig = {
 };
 
 const StatusBadge = ({ status }: StatusBadgeProps) => {
+  // Make sure status exists and is a valid key in statusConfig
+  if (!status || !Object.keys(statusConfig).includes(status)) {
+    console.error(`Invalid status provided to StatusBadge: ${status}`);
+    // Fallback to pending status if an invalid status is provided
+    status = 'pending';
+  }
+  
   const config = statusConfig[status];
   
   return (
