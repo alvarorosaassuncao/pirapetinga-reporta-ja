@@ -44,6 +44,15 @@ const MyReports = () => {
           throw error;
         }
         
+        // Log the image URLs to help with debugging
+        if (data && data.length > 0) {
+          console.log("Report data with images:", data.map(item => ({
+            id: item.id,
+            title: item.title,
+            imageUrl: item.image_url
+          })));
+        }
+        
         return data || [];
       } catch (error) {
         console.error("Error in query function:", error);

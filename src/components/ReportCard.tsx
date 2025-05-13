@@ -3,6 +3,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Calendar, MapPin } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import { Link } from "react-router-dom";
+import { useEffect } from "react";
 
 interface ReportCardProps {
   id: string;
@@ -26,6 +27,15 @@ const ReportCard = ({
   imageUrl
 }: ReportCardProps) => {
   const hasValidImage = imageUrl && imageUrl.trim() !== '';
+  
+  // Log the image URL for debugging purposes
+  useEffect(() => {
+    if (imageUrl) {
+      console.log(`ReportCard ${id} image URL:`, imageUrl);
+    } else {
+      console.log(`ReportCard ${id} has no image URL`);
+    }
+  }, [id, imageUrl]);
 
   return (
     <Card className="overflow-hidden card-hover">
@@ -36,7 +46,7 @@ const ReportCard = ({
             alt={title}
             className="w-full h-full object-cover"
             onError={(e) => {
-              console.error("Error loading card image:", imageUrl);
+              console.error(`Error loading image for report ${id}:`, imageUrl);
               (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80";
             }}
           />
