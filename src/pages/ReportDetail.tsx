@@ -1,4 +1,3 @@
-
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
@@ -21,41 +20,58 @@ const ReportDetail = () => {
     queryFn: async () => {
       if (!id) return null;
       
-      // Consulta modificada para buscar também o nome do usuário que fez a denúncia
-      const { data, error } = await supabase
-        .from("reports")
-        .select(`
-          *,
-          profiles:user_id (
-            name
-          )
-        `)
-        .eq("id", id)
-        .single();
-      
-      if (error) {
-        if (error.code === "PGRST116") {
-          return null; // Not found
+      try {
+        // Fetch report first
+        const { data: reportData, error: reportError } = await supabase
+          .from("reports")
+          .select("*")
+          .eq("id", id)
+          .single();
+        
+        if (reportError) {
+          if (reportError.code === "PGRST116") {
+            return null; // Not found
+          }
+          
+          toast({
+            title: "Erro ao carregar denúncia",
+            description: reportError.message,
+            variant: "destructive",
+          });
+          
+          throw reportError;
         }
         
-        toast({
-          title: "Erro ao carregar denúncia",
-          description: error.message,
-          variant: "destructive",
-        });
+        if (!reportData) {
+          return null;
+        }
         
+        // Now fetch profile data separately
+        let userName = "Usuário Anônimo";
+        
+        if (reportData.user_id) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("name")
+            .eq("id", reportData.user_id)
+            .single();
+            
+          if (profileData && profileData.name) {
+            userName = profileData.name;
+          }
+        }
+        
+        console.log("Fetched report data:", reportData, "Username:", userName);
+        
+        return {
+          ...reportData,
+          status: reportData.status as ReportStatus,
+          userName: userName
+        };
+      } catch (error) {
+        console.error("Error fetching report details:", error);
         throw error;
       }
-      
-      if (data) {
-        console.log("Fetched report data:", data);
-      }
-      
-      return {
-        ...data,
-        status: data.status as ReportStatus,
-        userName: data.profiles?.name || "Usuário Anônimo"
-      };
     }
   });
 
