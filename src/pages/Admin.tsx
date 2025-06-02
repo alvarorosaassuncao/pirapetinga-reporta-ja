@@ -7,26 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import StatusBadge from "@/components/StatusBadge";
-import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
+import AdminTable from "@/components/AdminTable";
+import AdminFilters from "@/components/AdminFilters";
 import { ReportStatus } from "@/types/report";
 
 const Admin = () => {
@@ -36,64 +18,100 @@ const Admin = () => {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
-  const [isAdmin, setIsAdmin] = useState(false);
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
 
-  // Check if user is admin
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) return;
+  // Check if user is admin with better error handling
+  const {
+    data: isAdmin,
+    isLoading: isLoadingAdmin,
+    error: adminError
+  } = useQuery({
+    queryKey: ["admin-check", user?.id],
+    queryFn: async () => {
+      if (!user) {
+        console.log("No user found for admin check");
+        return false;
+      }
       
       try {
-        setIsCheckingAdmin(true);
+        console.log("Checking admin status for user:", user.email);
+        
         const { data, error } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", user.id)
           .eq("role", "admin")
-          .single();
+          .maybeSingle();
         
-        if (error && error.code !== "PGRST116") {
+        if (error) {
           console.error("Error checking admin status:", error);
-          toast({
-            title: "Erro",
-            description: "Não foi possível verificar suas permissões",
-            variant: "destructive"
-          });
-          navigate("/");
-          return;
+          throw error;
         }
         
-        if (data) {
-          setIsAdmin(true);
-        } else {
-          toast({
-            title: "Acesso negado",
-            description: "Você não tem permissão para acessar esta página",
-            variant: "destructive"
-          });
-          navigate("/");
-        }
+        const hasAdminRole = !!data;
+        console.log("Admin check result:", { hasAdminRole, data });
+        
+        return hasAdminRole;
       } catch (error) {
-        console.error("Error checking admin status:", error);
-      } finally {
-        setIsCheckingAdmin(false);
+        console.error("Error in admin check query:", error);
+        throw error;
       }
-    };
-    
-    checkAdminStatus();
-  }, [user, navigate, toast]);
+    },
+    enabled: !!user,
+    retry: 3,
+    retryDelay: 1000
+  });
 
-  // Fetch all reports
+  // Redirect non-admin users
+  useEffect(() => {
+    if (!isLoadingAdmin && !isCheckingAdmin) {
+      if (!user) {
+        console.log("No user, redirecting to login");
+        navigate("/login");
+        return;
+      }
+      
+      if (isAdmin === false) {
+        console.log("User is not admin, redirecting");
+        toast({
+          title: "Acesso negado",
+          description: "Você não tem permissão para acessar esta página",
+          variant: "destructive"
+        });
+        navigate("/");
+        return;
+      }
+      
+      if (adminError) {
+        console.error("Admin check error:", adminError);
+        toast({
+          title: "Erro",
+          description: "Erro ao verificar permissões de administrador",
+          variant: "destructive"
+        });
+        navigate("/");
+        return;
+      }
+    }
+  }, [user, isAdmin, isLoadingAdmin, adminError, navigate, toast, isCheckingAdmin]);
+
+  // Set checking admin to false after initial load
+  useEffect(() => {
+    if (!isLoadingAdmin) {
+      setIsCheckingAdmin(false);
+    }
+  }, [isLoadingAdmin]);
+
+  // Fetch all reports with better error handling
   const { 
     data: reports, 
-    isLoading, 
-    error, 
+    isLoading: isLoadingReports, 
+    error: reportsError, 
     refetch 
   } = useQuery({
     queryKey: ["admin-reports"],
     queryFn: async () => {
-      if (!user || !isAdmin) return [];
+      console.log("Fetching reports for admin panel");
       
       const { data, error } = await supabase
         .from("reports")
@@ -102,27 +120,33 @@ const Admin = () => {
       
       if (error) {
         console.error("Error fetching reports:", error);
-        toast({
-          title: "Erro ao carregar denúncias",
-          description: error.message,
-          variant: "destructive"
-        });
         throw error;
       }
       
+      console.log("Reports fetched successfully:", data?.length);
       return data || [];
     },
-    enabled: !!user && isAdmin && !isCheckingAdmin
+    enabled: !!user && isAdmin === true,
+    retry: 3,
+    retryDelay: 1000
   });
 
   const updateReportStatus = async (reportId: string, newStatus: ReportStatus) => {
     try {
+      console.log("Updating report status:", { reportId, newStatus });
+      
       const { error } = await supabase
         .from("reports")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({ 
+          status: newStatus, 
+          updated_at: new Date().toISOString() 
+        })
         .eq("id", reportId);
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating report status:", error);
+        throw error;
+      }
       
       toast({
         title: "Status atualizado",
@@ -140,37 +164,41 @@ const Admin = () => {
     }
   };
 
-  const filterReports = () => {
-    if (!reports) return [];
-    
-    let filtered = [...reports];
-    
-    // Filter by status
-    if (activeTab !== "all") {
-      filtered = filtered.filter(report => report.status === activeTab);
-    }
-    
-    // Filter by search term
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(report => 
-        report.title.toLowerCase().includes(term) || 
-        report.description.toLowerCase().includes(term) ||
-        report.location.toLowerCase().includes(term) ||
-        report.category.toLowerCase().includes(term)
-      );
-    }
-    
-    return filtered;
-  };
-
-  if (isCheckingAdmin || !user) {
+  // Show loading while checking admin status
+  if (isLoadingAdmin || isCheckingAdmin || !user) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar />
         <main className="flex-grow py-10 bg-gray-50 flex items-center justify-center">
           <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-gray-600">Verificando permissões...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Don't render admin panel if user is not admin
+  if (isAdmin !== true) {
+    return null;
+  }
+
+  if (reportsError) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow py-10 bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">Erro ao carregar denúncias</h2>
+            <p className="text-gray-600 mb-4">Ocorreu um erro ao tentar carregar as denúncias.</p>
+            <button 
+              onClick={() => refetch()} 
+              className="bg-primary text-white px-4 py-2 rounded hover:bg-primary-700"
+            >
+              Tentar novamente
+            </button>
           </div>
         </main>
         <Footer />
@@ -192,90 +220,21 @@ const Admin = () => {
           </div>
           
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
-                <TabsList>
-                  <TabsTrigger value="all">Todos</TabsTrigger>
-                  <TabsTrigger value="pending">Pendentes</TabsTrigger>
-                  <TabsTrigger value="in-progress">Em Análise</TabsTrigger>
-                  <TabsTrigger value="resolved">Resolvidos</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                <Input
-                  type="text"
-                  placeholder="Pesquisar denúncias..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
+            <AdminFilters 
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
             
-            {isLoading ? (
-              <div className="text-center py-8">
-                <p>Carregando denúncias...</p>
-              </div>
-            ) : error ? (
-              <div className="text-center py-8">
-                <p className="text-red-500">Erro ao carregar denúncias</p>
-                <Button onClick={() => refetch()} className="mt-2">Tentar novamente</Button>
-              </div>
-            ) : !reports || reports.length === 0 ? (
-              <div className="text-center py-8">
-                <p>Nenhuma denúncia encontrada.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[250px]">Título</TableHead>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead>Localização</TableHead>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filterReports().map((report) => (
-                      <TableRow key={report.id}>
-                        <TableCell className="font-medium">
-                          <a href={`/report/${report.id}`} className="hover:text-primary">
-                            {report.title}
-                          </a>
-                        </TableCell>
-                        <TableCell>{report.category}</TableCell>
-                        <TableCell>{report.location}</TableCell>
-                        <TableCell>{new Date(report.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <StatusBadge status={report.status as ReportStatus} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Select
-                            value={report.status}
-                            onValueChange={(value) => updateReportStatus(report.id, value as ReportStatus)}
-                          >
-                            <SelectTrigger className="w-[130px]">
-                              <SelectValue placeholder="Alterar status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pendente</SelectItem>
-                              <SelectItem value="in-progress">Em Análise</SelectItem>
-                              <SelectItem value="resolved">Resolvido</SelectItem>
-                              <SelectItem value="rejected">Rejeitado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+            <AdminTable
+              reports={reports || []}
+              isLoading={isLoadingReports}
+              activeTab={activeTab}
+              searchTerm={searchTerm}
+              updateReportStatus={updateReportStatus}
+              refetch={refetch}
+            />
           </div>
         </div>
       </main>

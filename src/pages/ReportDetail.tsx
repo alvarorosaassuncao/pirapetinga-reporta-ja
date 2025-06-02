@@ -1,86 +1,78 @@
+
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, Calendar, MapPin, User } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, MapPin, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/AuthContext";
 import { ReportStatus } from "@/types/report";
 
 const ReportDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { toast } = useToast();
-  const { user } = useAuth();
 
-  const { data: report, isLoading, error } = useQuery({
+  const { data: report, isLoading: reportLoading, error: reportError } = useQuery({
     queryKey: ["report", id],
     queryFn: async () => {
-      if (!id) return null;
+      if (!id) throw new Error("ID da denúncia não fornecido");
       
-      try {
-        // Fetch report first
-        const { data: reportData, error: reportError } = await supabase
-          .from("reports")
-          .select("*")
-          .eq("id", id)
-          .single();
-        
-        if (reportError) {
-          if (reportError.code === "PGRST116") {
-            return null; // Not found
-          }
-          
-          toast({
-            title: "Erro ao carregar denúncia",
-            description: reportError.message,
-            variant: "destructive",
-          });
-          
-          throw reportError;
-        }
-        
-        if (!reportData) {
-          return null;
-        }
-        
-        // Now fetch profile data separately
-        let userName = "Usuário Anônimo";
-        
-        if (reportData.user_id) {
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("name")
-            .eq("id", reportData.user_id)
-            .single();
-            
-          if (profileData && profileData.name) {
-            userName = profileData.name;
-          }
-        }
-        
-        console.log("Fetched report data:", reportData, "Username:", userName);
-        
-        return {
-          ...reportData,
-          status: reportData.status as ReportStatus,
-          userName: userName
-        };
-      } catch (error) {
-        console.error("Error fetching report details:", error);
+      console.log("Fetching report details for ID:", id);
+      
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error fetching report:", error);
         throw error;
       }
-    }
+      
+      if (!data) {
+        throw new Error("Denúncia não encontrada");
+      }
+      
+      console.log("Report fetched successfully:", data);
+      return data;
+    },
+    enabled: !!id,
+    retry: 3
   });
 
-  if (isLoading) {
+  const { data: userProfile, isLoading: profileLoading } = useQuery({
+    queryKey: ["user-profile", report?.user_id],
+    queryFn: async () => {
+      if (!report?.user_id) return null;
+      
+      console.log("Fetching user profile for user_id:", report.user_id);
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", report.user_id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error fetching user profile:", error);
+        return null;
+      }
+      
+      console.log("User profile fetched:", data);
+      return data;
+    },
+    enabled: !!report?.user_id,
+    retry: 2
+  });
+
+  if (reportLoading) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar />
         <main className="flex-grow py-10 bg-gray-50 flex items-center justify-center">
           <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-gray-600">Carregando detalhes da denúncia...</p>
           </div>
         </main>
@@ -89,16 +81,20 @@ const ReportDetail = () => {
     );
   }
 
-  if (error || !report) {
+  if (reportError || !report) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar />
         <main className="flex-grow py-10 bg-gray-50 flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-700">Denúncia não encontrada</h2>
-            <p className="mt-2 text-gray-600">A denúncia que você está procurando não existe ou você não tem permissão para visualizá-la.</p>
-            <Link to="/my-reports">
-              <Button className="mt-4">Voltar para Minhas Denúncias</Button>
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">
+              Denúncia não encontrada
+            </h2>
+            <p className="text-gray-600 mb-4">
+              A denúncia que você está procurando não existe ou foi removida.
+            </p>
+            <Link to="/">
+              <Button>Voltar ao início</Button>
             </Link>
           </div>
         </main>
@@ -107,8 +103,7 @@ const ReportDetail = () => {
     );
   }
 
-  const formattedDate = report ? new Date(report.created_at).toLocaleDateString() : '';
-  const hasImage = report?.image_url && report.image_url.trim() !== '';
+  const userName = userProfile?.name || "Usuário não identificado";
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -117,107 +112,77 @@ const ReportDetail = () => {
       <main className="flex-grow py-10 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-6">
-            <Link to="/my-reports" className="inline-flex items-center text-primary hover:text-primary-700">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              <span>Voltar para Minhas Denúncias</span>
+            <Link 
+              to="/" 
+              className="inline-flex items-center text-primary hover:text-primary-700 mb-4"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar para lista de denúncias
             </Link>
           </div>
           
-          {report && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-              <div className="h-64 w-full relative">
-                {hasImage ? (
-                  <img 
-                    src={report.image_url} 
-                    alt={report.title || "Imagem da denúncia"}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      console.error("Error loading image:", report.image_url);
-                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80";
-                    }}
-                  />
-                ) : (
-                  <img 
-                    src="https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" 
-                    alt="Imagem padrão"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                <div className="absolute top-4 right-4">
-                  <StatusBadge status={report.status} />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+            {report.image_url && (
+              <div className="w-full h-64 sm:h-80">
+                <img 
+                  src={report.image_url} 
+                  alt={report.title || "Imagem da denúncia"}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error("Error loading report image:", report.image_url);
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            <div className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                <div className="mb-2 sm:mb-0">
+                  <span className="inline-block bg-primary/10 text-primary text-sm font-medium px-3 py-1 rounded-full">
+                    {report.category}
+                  </span>
+                </div>
+                <StatusBadge status={report.status as ReportStatus} />
+              </div>
+              
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
+                {report.title || "Denúncia sem título"}
+              </h1>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm text-gray-600">
+                <div className="flex items-center">
+                  <MapPin className="mr-2 h-4 w-4" />
+                  <span>{report.location}</span>
+                </div>
+                <div className="flex items-center">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  <span>{new Date(report.created_at).toLocaleDateString('pt-BR')}</span>
+                </div>
+                <div className="flex items-center">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>
+                    {profileLoading ? "Carregando..." : userName}
+                  </span>
                 </div>
               </div>
               
-              <div className="p-6">
-                <div className="mb-6">
-                  <p className="text-sm text-primary font-medium">{report.category}</p>
-                  <h1 className="text-2xl font-bold mt-1">{report.title}</h1>
-                </div>
-                
-                <div className="mb-6">
-                  <h2 className="text-lg font-medium mb-2">Descrição</h2>
-                  <p className="text-gray-700">{report.description}</p>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h2 className="text-lg font-medium mb-2">Localização</h2>
-                    <div className="flex items-center text-gray-700">
-                      <MapPin className="h-5 w-5 mr-2 text-gray-400" />
-                      {report.location}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h2 className="text-lg font-medium mb-2">Data da Denúncia</h2>
-                    <div className="flex items-center text-gray-700">
-                      <Calendar className="h-5 w-5 mr-2 text-gray-400" />
-                      {formattedDate}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Adicionando informação do usuário que fez a denúncia */}
-                <div className="mt-6">
-                  <h2 className="text-lg font-medium mb-2">Reportado por</h2>
-                  <div className="flex items-center text-gray-700">
-                    <User className="h-5 w-5 mr-2 text-gray-400" />
-                    {report.userName || "Usuário Anônimo"}
-                  </div>
-                </div>
-                
-                <div className="mt-8 border-t border-gray-100 pt-6">
-                  <h2 className="text-lg font-medium mb-4">Atualizações</h2>
-                  
-                  {report.status === "pending" ? (
-                    <div className="bg-yellow-50 p-4 rounded-md">
-                      <p className="text-yellow-800">
-                        Sua denúncia foi recebida e está aguardando análise pela equipe responsável.
-                      </p>
-                    </div>
-                  ) : report.status === "in-progress" ? (
-                    <div className="bg-blue-50 p-4 rounded-md">
-                      <p className="text-blue-800">
-                        Sua denúncia está sendo analisada pela equipe responsável.
-                      </p>
-                    </div>
-                  ) : report.status === "resolved" ? (
-                    <div className="bg-green-50 p-4 rounded-md">
-                      <p className="text-green-800">
-                        O problema reportado foi resolvido. Obrigado por contribuir com a melhoria da cidade!
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="bg-red-50 p-4 rounded-md">
-                      <p className="text-red-800">
-                        Sua denúncia foi rejeitada. Por favor, entre em contato com a prefeitura para mais informações.
-                      </p>
-                    </div>
-                  )}
-                </div>
+              <div className="prose prose-gray max-w-none">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Descrição</h3>
+                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  {report.description}
+                </p>
               </div>
+              
+              {report.updated_at && report.updated_at !== report.created_at && (
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-500">
+                    Última atualização: {new Date(report.updated_at).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </main>
       

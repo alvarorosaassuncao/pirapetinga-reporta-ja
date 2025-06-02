@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
@@ -24,44 +23,37 @@ const MyReports = () => {
     error,
     refetch
   } = useQuery({
-    queryKey: ["reports", user?.id],
+    queryKey: ["user-reports", user?.id],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user) {
+        console.log("No user found for reports query");
+        return [];
+      }
       
       try {
+        console.log("Fetching reports for user:", user.id);
+        
         const { data, error } = await supabase
           .from("reports")
           .select("*")
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
         
         if (error) {
-          console.error("Error fetching reports:", error);
-          toast({
-            title: "Erro ao carregar denúncias",
-            description: error.message,
-            variant: "destructive"
-          });
+          console.error("Error fetching user reports:", error);
           throw error;
         }
         
-        // Log the image URLs to help with debugging
-        if (data && data.length > 0) {
-          console.log("Report data with images:", data.map(item => ({
-            id: item.id,
-            title: item.title,
-            imageUrl: item.image_url
-          })));
-        } else {
-          console.log("Nenhuma denúncia encontrada para o usuário", user.id);
-        }
-        
+        console.log("User reports fetched successfully:", data?.length);
         return data || [];
       } catch (error) {
-        console.error("Error in query function:", error);
+        console.error("Error in reports query function:", error);
         throw error;
       }
     },
-    enabled: !!user
+    enabled: !!user,
+    retry: 3,
+    retryDelay: 1000
   });
   
   const filterReports = (status?: ReportStatus | "all") => {
@@ -80,7 +72,8 @@ const MyReports = () => {
         <Navbar />
         <main className="flex-grow py-10 bg-gray-50 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-gray-600">Carregando denúncias...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-gray-600">Carregando suas denúncias...</p>
           </div>
         </main>
         <Footer />
@@ -139,10 +132,16 @@ const MyReports = () => {
           ) : (
             <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="mb-6">
-                <TabsTrigger value="all">Todos</TabsTrigger>
-                <TabsTrigger value="pending">Pendentes</TabsTrigger>
-                <TabsTrigger value="in-progress">Em Análise</TabsTrigger>
-                <TabsTrigger value="resolved">Resolvidos</TabsTrigger>
+                <TabsTrigger value="all">Todos ({reports.length})</TabsTrigger>
+                <TabsTrigger value="pending">
+                  Pendentes ({filterReports('pending').length})
+                </TabsTrigger>
+                <TabsTrigger value="in-progress">
+                  Em Análise ({filterReports('in-progress').length})
+                </TabsTrigger>
+                <TabsTrigger value="resolved">
+                  Resolvidos ({filterReports('resolved').length})
+                </TabsTrigger>
               </TabsList>
               
               <TabsContent value="all" className="mt-0">
@@ -156,7 +155,7 @@ const MyReports = () => {
                       category={report.category}
                       location={report.location}
                       status={report.status as ReportStatus}
-                      date={new Date(report.created_at).toLocaleDateString()}
+                      date={new Date(report.created_at).toLocaleDateString('pt-BR')}
                       imageUrl={report.image_url}
                     />
                   ))}
@@ -174,7 +173,7 @@ const MyReports = () => {
                       category={report.category}
                       location={report.location}
                       status={report.status as ReportStatus}
-                      date={new Date(report.created_at).toLocaleDateString()}
+                      date={new Date(report.created_at).toLocaleDateString('pt-BR')}
                       imageUrl={report.image_url}
                     />
                   ))}
@@ -192,7 +191,7 @@ const MyReports = () => {
                       category={report.category}
                       location={report.location}
                       status={report.status as ReportStatus}
-                      date={new Date(report.created_at).toLocaleDateString()}
+                      date={new Date(report.created_at).toLocaleDateString('pt-BR')}
                       imageUrl={report.image_url}
                     />
                   ))}
@@ -210,7 +209,7 @@ const MyReports = () => {
                       category={report.category}
                       location={report.location}
                       status={report.status as ReportStatus}
-                      date={new Date(report.created_at).toLocaleDateString()}
+                      date={new Date(report.created_at).toLocaleDateString('pt-BR')}
                       imageUrl={report.image_url}
                     />
                   ))}

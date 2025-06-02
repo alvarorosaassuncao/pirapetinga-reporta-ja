@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AdminRoute from "@/components/AdminRoute";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -18,7 +19,15 @@ import Terms from "./pages/Terms";
 import Admin from "./pages/Admin";
 import MakeAdmin from "./pages/MakeAdmin";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 3,
+      retryDelay: 1000,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -45,11 +54,18 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             <Route path="/admin" element={
               <ProtectedRoute>
-                <Admin />
+                <AdminRoute>
+                  <Admin />
+                </AdminRoute>
               </ProtectedRoute>
             } />
-            <Route path="/make-admin" element={<MakeAdmin />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="/make-admin" element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <MakeAdmin />
+                </AdminRoute>
+              </ProtectedRoute>
+            } />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

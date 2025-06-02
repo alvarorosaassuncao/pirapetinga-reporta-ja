@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { 
@@ -7,16 +7,49 @@ import {
   MapPin, 
   List,
   User,
-  LogOut
+  LogOut,
+  Shield
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, signOut } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const { user, signOut, userName } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+        
+        if (!error && data) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        setIsAdmin(false);
+      }
+    };
+    
+    checkAdminStatus();
+  }, [user]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -34,7 +67,6 @@ const Navbar = () => {
       console.error("Error signing out:", error);
     }
     
-    // Close the mobile menu after signing out
     if (isMenuOpen) {
       setIsMenuOpen(false);
     }
@@ -56,17 +88,27 @@ const Navbar = () => {
             <Link to="/" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md font-medium">
               Início
             </Link>
-            <Link to="/report-problem" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md font-medium">
-              Reportar Problema
-            </Link>
-            <Link to="/my-reports" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md font-medium">
-              Minhas Denúncias
-            </Link>
+            {user && (
+              <>
+                <Link to="/report-problem" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md font-medium">
+                  Reportar Problema
+                </Link>
+                <Link to="/my-reports" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md font-medium">
+                  Minhas Denúncias
+                </Link>
+                {isAdmin && (
+                  <Link to="/admin" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md font-medium flex items-center">
+                    <Shield className="h-4 w-4 mr-1" />
+                    Admin
+                  </Link>
+                )}
+              </>
+            )}
             
             {user ? (
               <div className="flex items-center ml-2">
                 <span className="text-gray-700 mr-4">
-                  Olá, {user.user_metadata?.name || user.email?.split('@')[0]}
+                  Olá, {userName || user.email?.split('@')[0]}
                 </span>
                 <Button 
                   variant="outline" 
@@ -109,25 +151,39 @@ const Navbar = () => {
             >
               Início
             </Link>
-            <Link 
-              to="/report-problem" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-secondary"
-              onClick={toggleMenu}
-            >
-              Reportar Problema
-            </Link>
-            <Link 
-              to="/my-reports" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-secondary"
-              onClick={toggleMenu}
-            >
-              Minhas Denúncias
-            </Link>
+            {user && (
+              <>
+                <Link 
+                  to="/report-problem" 
+                  className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-secondary"
+                  onClick={toggleMenu}
+                >
+                  Reportar Problema
+                </Link>
+                <Link 
+                  to="/my-reports" 
+                  className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-secondary"
+                  onClick={toggleMenu}
+                >
+                  Minhas Denúncias
+                </Link>
+                {isAdmin && (
+                  <Link 
+                    to="/admin" 
+                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-secondary flex items-center"
+                    onClick={toggleMenu}
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Administração
+                  </Link>
+                )}
+              </>
+            )}
 
             {user ? (
               <div className="pt-2 pb-1">
                 <div className="px-3 py-2 text-base font-medium text-gray-700">
-                  Olá, {user.user_metadata?.name || user.email?.split('@')[0]}
+                  Olá, {userName || user.email?.split('@')[0]}
                 </div>
                 <Button 
                   variant="outline" 
