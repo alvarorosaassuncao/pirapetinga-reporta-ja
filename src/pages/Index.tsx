@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -107,10 +106,8 @@ const Index = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
+                  icon={<Search className="h-4 w-4 text-gray-400" />}
                 />
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
               </div>
               
               <div className="w-full sm:w-auto flex space-x-2">
@@ -141,14 +138,7 @@ const Index = () => {
                         filterReports().map((report) => (
                           <ReportCard
                             key={report.id}
-                            id={report.id}
-                            title={report.title || "Sem título"}
-                            description={report.description}
-                            category={report.category}
-                            location={report.location}
-                            status={report.status as ReportStatus || "pending"}
-                            date={formatDate(report.created_at)}
-                            imageUrl={report.image_url || undefined}
+                            report={report}
                           />
                         ))
                       ) : (
@@ -165,14 +155,7 @@ const Index = () => {
                         filterReports('pending').map((report) => (
                           <ReportCard
                             key={report.id}
-                            id={report.id}
-                            title={report.title || "Sem título"}
-                            description={report.description}
-                            category={report.category}
-                            location={report.location}
-                            status={report.status as ReportStatus || "pending"}
-                            date={formatDate(report.created_at)}
-                            imageUrl={report.image_url || undefined}
+                            report={report}
                           />
                         ))
                       ) : (
@@ -189,14 +172,7 @@ const Index = () => {
                         filterReports('in-progress').map((report) => (
                           <ReportCard
                             key={report.id}
-                            id={report.id}
-                            title={report.title || "Sem título"}
-                            description={report.description}
-                            category={report.category}
-                            location={report.location}
-                            status={report.status as ReportStatus || "pending"}
-                            date={formatDate(report.created_at)}
-                            imageUrl={report.image_url || undefined}
+                            report={report}
                           />
                         ))
                       ) : (
@@ -213,14 +189,7 @@ const Index = () => {
                         filterReports('resolved').map((report) => (
                           <ReportCard
                             key={report.id}
-                            id={report.id}
-                            title={report.title || "Sem título"}
-                            description={report.description}
-                            category={report.category}
-                            location={report.location}
-                            status={report.status as ReportStatus || "pending"}
-                            date={formatDate(report.created_at)}
-                            imageUrl={report.image_url || undefined}
+                            report={report}
                           />
                         ))
                       ) : (

@@ -149,14 +149,7 @@ const MyReports = () => {
                   {filterReports().map((report) => (
                     <ReportCard
                       key={report.id}
-                      id={report.id}
-                      title={report.title}
-                      description={report.description}
-                      category={report.category}
-                      location={report.location}
-                      status={report.status as ReportStatus}
-                      date={new Date(report.created_at).toLocaleDateString('pt-BR')}
-                      imageUrl={report.image_url}
+                      report={report}
                     />
                   ))}
                 </div>
@@ -167,14 +160,7 @@ const MyReports = () => {
                   {filterReports('pending' as ReportStatus).map((report) => (
                     <ReportCard
                       key={report.id}
-                      id={report.id}
-                      title={report.title}
-                      description={report.description}
-                      category={report.category}
-                      location={report.location}
-                      status={report.status as ReportStatus}
-                      date={new Date(report.created_at).toLocaleDateString('pt-BR')}
-                      imageUrl={report.image_url}
+                      report={report}
                     />
                   ))}
                 </div>
@@ -185,14 +171,7 @@ const MyReports = () => {
                   {filterReports('in-progress' as ReportStatus).map((report) => (
                     <ReportCard
                       key={report.id}
-                      id={report.id}
-                      title={report.title}
-                      description={report.description}
-                      category={report.category}
-                      location={report.location}
-                      status={report.status as ReportStatus}
-                      date={new Date(report.created_at).toLocaleDateString('pt-BR')}
-                      imageUrl={report.image_url}
+                      report={report}
                     />
                   ))}
                 </div>
@@ -203,14 +182,7 @@ const MyReports = () => {
                   {filterReports('resolved' as ReportStatus).map((report) => (
                     <ReportCard
                       key={report.id}
-                      id={report.id}
-                      title={report.title}
-                      description={report.description}
-                      category={report.category}
-                      location={report.location}
-                      status={report.status as ReportStatus}
-                      date={new Date(report.created_at).toLocaleDateString('pt-BR')}
-                      imageUrl={report.image_url}
+                      report={report}
                     />
                   ))}
                 </div>

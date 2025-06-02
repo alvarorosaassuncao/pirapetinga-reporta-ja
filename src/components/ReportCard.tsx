@@ -19,14 +19,18 @@ interface Report {
 
 interface ReportCardProps {
   report: Report;
+  id?: string; // Add id prop for backward compatibility
 }
 
-const ReportCard = ({ report }: ReportCardProps) => {
+const ReportCard = ({ report, id }: ReportCardProps) => {
   // Early return if report is not provided
   if (!report) {
     console.warn("ReportCard: report prop is undefined");
     return null;
   }
+
+  // For backwards compatibility with components that pass id separately
+  const reportId = report.id || id;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -153,7 +157,7 @@ const ReportCard = ({ report }: ReportCardProps) => {
         )}
 
         <div className="pt-2 border-t">
-          <Link to={`/report/${report.id}`}>
+          <Link to={`/report/${reportId}`}>
             <Button variant="outline" size="sm" className="w-full">
               <Eye className="h-4 w-4 mr-2" />
               Ver Detalhes
