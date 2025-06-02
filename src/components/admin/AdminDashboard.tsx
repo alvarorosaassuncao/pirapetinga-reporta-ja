@@ -1,40 +1,46 @@
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Search, FileText, Clock, CheckCircle, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Search, FileText, Clock, CheckCircle, XCircle } from "lucide-react";
-import ReportManagementCard from "./ReportManagementCard";
 import { ReportStatus } from "@/types/report";
+import ReportManagementCard from "./ReportManagementCard";
+
+interface Report {
+  id: string;
+  title: string;
+  category: string;
+  location: string;
+  status: string;
+  created_at: string;
+  description: string;
+  user_id: string;
+  image_url?: string;
+}
 
 const AdminDashboard = () => {
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("pending");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Fetch all reports with user profiles
-  const { 
-    data: reports, 
-    isLoading, 
-    error, 
-    refetch 
+  // Fetch reports
+  const {
+    data: reports = [],
+    isLoading: isLoadingReports,
+    error: reportsError
   } = useQuery({
-    queryKey: ["admin-reports-dashboard"],
+    queryKey: ["admin-reports"],
     queryFn: async () => {
-      console.log("Fetching reports with user profiles for admin dashboard");
+      console.log("Fetching reports for admin dashboard...");
       
       const { data, error } = await supabase
         .from("reports")
-        .select(`
-          *,
-          profiles!reports_user_id_fkey (
-            name
-          )
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
       
       if (error) {
@@ -42,240 +48,285 @@ const AdminDashboard = () => {
         throw error;
       }
       
-      console.log("Reports with profiles fetched:", data?.length);
+      console.log("Fetched reports:", data);
       return data || [];
-    },
-    retry: 3,
-    retryDelay: 1000
+    }
   });
 
-  const updateReportStatus = async (reportId: string, newStatus: ReportStatus) => {
-    try {
+  // Fetch user profiles to get names
+  const {
+    data: profiles = [],
+    isLoading: isLoadingProfiles
+  } = useQuery({
+    queryKey: ["user-profiles"],
+    queryFn: async () => {
+      console.log("Fetching user profiles...");
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, name");
+      
+      if (error) {
+        console.error("Error fetching profiles:", error);
+        return [];
+      }
+      
+      console.log("Fetched profiles:", data);
+      return data || [];
+    }
+  });
+
+  // Get user name by ID
+  const getUserName = (userId: string) => {
+    const profile = profiles.find(p => p.id === userId);
+    return profile?.name || "Usuário não identificado";
+  };
+
+  // Update report status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ reportId, newStatus }: { reportId: string; newStatus: ReportStatus }) => {
       console.log("Updating report status:", { reportId, newStatus });
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("reports")
         .update({ 
-          status: newStatus, 
-          updated_at: new Date().toISOString() 
+          status: newStatus,
+          updated_at: new Date().toISOString()
         })
-        .eq("id", reportId);
+        .eq("id", reportId)
+        .select()
+        .single();
       
       if (error) {
         console.error("Error updating report status:", error);
         throw error;
       }
       
+      console.log("Updated report:", data);
+      return data;
+    },
+    onSuccess: (updatedReport) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
       toast({
         title: "Status atualizado",
-        description: `A denúncia foi marcada como ${getStatusLabel(newStatus)}.`,
+        description: `Denúncia foi marcada como ${getStatusLabel(updatedReport.status)}`
       });
-      
-      refetch();
-    } catch (error: any) {
-      console.error("Error updating report status:", error);
+    },
+    onError: (error) => {
+      console.error("Failed to update status:", error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao atualizar status da denúncia",
+        description: "Não foi possível atualizar o status da denúncia",
         variant: "destructive"
       });
     }
-  };
+  });
 
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return 'Pendente';
       case 'in-progress': return 'Em Análise';
-      case 'resolved': return 'Resolvida';
-      case 'rejected': return 'Rejeitada';
+      case 'resolved': return 'Resolvido';
+      case 'rejected': return 'Rejeitado';
       default: return status;
     }
   };
 
-  const filterReports = (status?: string) => {
-    if (!reports) return [];
-    
-    let filtered = [...reports];
-    
-    // Filter by status
-    if (status && status !== "all") {
-      filtered = filtered.filter(report => report.status === status);
-    }
-    
-    // Filter by search term
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(report => 
-        report.title?.toLowerCase().includes(term) || 
-        report.description?.toLowerCase().includes(term) ||
-        report.location?.toLowerCase().includes(term) ||
-        report.category?.toLowerCase().includes(term) ||
-        report.profiles?.name?.toLowerCase().includes(term)
-      );
-    }
-    
-    return filtered;
-  };
-
-  const getReportCounts = () => {
-    if (!reports) return { pending: 0, inProgress: 0, resolved: 0, rejected: 0 };
-    
-    return {
+  const getStatusStats = () => {
+    const stats = {
       pending: reports.filter(r => r.status === 'pending').length,
-      inProgress: reports.filter(r => r.status === 'in-progress').length,
+      'in-progress': reports.filter(r => r.status === 'in-progress').length,
       resolved: reports.filter(r => r.status === 'resolved').length,
       rejected: reports.filter(r => r.status === 'rejected').length,
+      total: reports.length
     };
+    return stats;
+  };
+
+  const handleStatusChange = async (reportId: string, newStatus: ReportStatus) => {
+    await updateStatusMutation.mutateAsync({ reportId, newStatus });
   };
 
   const handleViewDetails = (reportId: string) => {
     window.open(`/report/${reportId}`, '_blank');
   };
 
-  if (isLoading) {
+  // Filter reports based on search and status
+  const filteredReports = reports.filter(report => {
+    const matchesSearch = !searchTerm || 
+      report.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      report.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      report.location?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || report.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  if (isLoadingReports || isLoadingProfiles) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando denúncias...</p>
-        </div>
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
       </div>
     );
   }
 
-  if (error) {
+  if (reportsError) {
     return (
-      <div className="text-center py-8">
-        <h2 className="text-xl font-semibold text-gray-700 mb-2">Erro ao carregar denúncias</h2>
-        <p className="text-gray-600 mb-4">Ocorreu um erro ao tentar carregar as denúncias.</p>
-        <button 
-          onClick={() => refetch()} 
-          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-        >
-          Tentar novamente
-        </button>
+      <div className="text-center p-8">
+        <p className="text-red-600">Erro ao carregar denúncias: {reportsError.message}</p>
       </div>
     );
   }
 
-  const counts = getReportCounts();
-  const filteredReports = filterReports(activeTab);
+  const stats = getStatusStats();
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-600" />
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card className="bg-blue-50 border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-blue-600 flex items-center">
+              <FileText className="h-4 w-4 mr-2" />
+              Total
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{counts.pending}</div>
+            <div className="text-2xl font-bold text-blue-900">{stats.total}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Em Análise</CardTitle>
-            <FileText className="h-4 w-4 text-blue-600" />
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-yellow-600 flex items-center">
+              <Clock className="h-4 w-4 mr-2" />
+              Pendentes
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{counts.inProgress}</div>
+            <div className="text-2xl font-bold text-yellow-900">{stats.pending}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resolvidas</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+        <Card className="bg-blue-50 border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-blue-600 flex items-center">
+              <Clock className="h-4 w-4 mr-2" />
+              Em Análise
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{counts.resolved}</div>
+            <div className="text-2xl font-bold text-blue-900">{stats['in-progress']}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rejeitadas</CardTitle>
-            <XCircle className="h-4 w-4 text-red-600" />
+        <Card className="bg-green-50 border-green-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-green-600 flex items-center">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Resolvidas
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{counts.rejected}</div>
+            <div className="text-2xl font-bold text-green-900">{stats.resolved}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-red-50 border-red-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-red-600 flex items-center">
+              <XCircle className="h-4 w-4 mr-2" />
+              Rejeitadas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-900">{stats.rejected}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-        <Input
-          type="text"
-          placeholder="Buscar denúncias..."
-          className="pl-10"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      {/* Tabs for Status Filtering */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 w-full max-w-md">
-          <TabsTrigger value="pending" className="relative">
-            Pendentes
-            {counts.pending > 0 && (
-              <Badge className="ml-2 bg-yellow-600 text-white text-xs">{counts.pending}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="in-progress" className="relative">
-            Em Análise
-            {counts.inProgress > 0 && (
-              <Badge className="ml-2 bg-blue-600 text-white text-xs">{counts.inProgress}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="resolved" className="relative">
-            Resolvidas
-            {counts.resolved > 0 && (
-              <Badge className="ml-2 bg-green-600 text-white text-xs">{counts.resolved}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="rejected" className="relative">
-            Rejeitadas
-            {counts.rejected > 0 && (
-              <Badge className="ml-2 bg-red-600 text-white text-xs">{counts.rejected}</Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        <div className="mt-6">
-          {filteredReports.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Nenhuma denúncia encontrada
-              </h3>
-              <p className="text-gray-500">
-                {searchTerm 
-                  ? "Tente ajustar sua busca ou filtros." 
-                  : `Não há denúncias ${getStatusLabel(activeTab).toLowerCase()} no momento.`
-                }
-              </p>
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtros</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Buscar por título, descrição ou localização..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+                icon={<Search className="h-4 w-4" />}
+              />
             </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {filteredReports.map((report) => (
-                <ReportManagementCard
-                  key={report.id}
-                  report={report}
-                  onStatusChange={updateReportStatus}
-                  onViewDetails={handleViewDetails}
-                  userName={report.profiles?.name}
-                />
-              ))}
+            <div className="flex gap-2 flex-wrap">
+              <Badge 
+                variant={statusFilter === "all" ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setStatusFilter("all")}
+              >
+                Todas ({stats.total})
+              </Badge>
+              <Badge 
+                variant={statusFilter === "pending" ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setStatusFilter("pending")}
+              >
+                Pendentes ({stats.pending})
+              </Badge>
+              <Badge 
+                variant={statusFilter === "in-progress" ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setStatusFilter("in-progress")}
+              >
+                Em Análise ({stats['in-progress']})
+              </Badge>
+              <Badge 
+                variant={statusFilter === "resolved" ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setStatusFilter("resolved")}
+              >
+                Resolvidas ({stats.resolved})
+              </Badge>
+              <Badge 
+                variant={statusFilter === "rejected" ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setStatusFilter("rejected")}
+              >
+                Rejeitadas ({stats.rejected})
+              </Badge>
             </div>
-          )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Reports Grid */}
+      {filteredReports.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-gray-500">
+              {searchTerm || statusFilter !== "all" 
+                ? "Nenhuma denúncia encontrada com os filtros aplicados." 
+                : "Nenhuma denúncia encontrada."}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredReports.map((report) => (
+            <ReportManagementCard
+              key={report.id}
+              report={report}
+              onStatusChange={handleStatusChange}
+              onViewDetails={handleViewDetails}
+              userName={getUserName(report.user_id)}
+            />
+          ))}
         </div>
-      </Tabs>
+      )}
     </div>
   );
 };
