@@ -1,98 +1,149 @@
 
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Calendar, MapPin } from "lucide-react";
-import StatusBadge from "./StatusBadge";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Calendar, MapPin, Eye, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useEffect } from "react";
 
-interface ReportCardProps {
+interface Report {
   id: string;
   title: string;
-  description: string;
   category: string;
   location: string;
-  status: 'pending' | 'in-progress' | 'resolved' | 'rejected';
-  date: string;
-  imageUrl?: string;
+  status: string;
+  created_at: string;
+  description: string;
+  image_url?: string;
+  updated_at?: string;
 }
 
-const ReportCard = ({
-  id,
-  title,
-  description,
-  category,
-  location,
-  status,
-  date,
-  imageUrl
-}: ReportCardProps) => {
-  const hasValidImage = imageUrl && imageUrl.trim() !== '';
-  
-  // Log the image URL for debugging purposes
-  useEffect(() => {
-    if (imageUrl) {
-      console.log(`ReportCard ${id} image URL:`, imageUrl);
-    } else {
-      console.log(`ReportCard ${id} has no image URL`);
+interface ReportCardProps {
+  report: Report;
+}
+
+const ReportCard = ({ report }: ReportCardProps) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'in-progress':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'resolved':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
-  }, [id, imageUrl]);
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Pendente';
+      case 'in-progress': return 'Em Análise';
+      case 'resolved': return 'Resolvido';
+      case 'rejected': return 'Rejeitado';
+      default: return status;
+    }
+  };
+
+  // Check if report was recently updated (within last 7 days)
+  const isRecentlyUpdated = () => {
+    if (!report.updated_at || report.updated_at === report.created_at) return false;
+    
+    const updateDate = new Date(report.updated_at);
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    return updateDate > weekAgo;
+  };
+
+  const showUpdateNotification = () => {
+    return isRecentlyUpdated() && (report.status === 'resolved' || report.status === 'rejected' || report.status === 'in-progress');
+  };
 
   return (
-    <Card className="overflow-hidden card-hover">
-      <div className="relative h-48 w-full">
-        {hasValidImage ? (
-          <img 
-            src={imageUrl} 
-            alt={title}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              console.error(`Error loading image for report ${id}:`, imageUrl);
-              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80";
-            }}
-          />
-        ) : (
-          <img 
-            src="https://images.unsplash.com/photo-1524230572899-a752b3835840?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" 
-            alt="Imagem padrão"
-            className="w-full h-full object-cover"
-          />
-        )}
-        <div className="absolute top-2 right-2">
-          <StatusBadge status={status} />
-        </div>
-      </div>
-
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="text-sm text-primary font-medium">{category}</p>
-            <h3 className="text-lg font-bold leading-tight mt-1">{title}</h3>
+    <Card className="hover:shadow-md transition-shadow duration-200 relative">
+      {/* Update notification indicator */}
+      {showUpdateNotification() && (
+        <div className="absolute -top-2 -right-2 z-10">
+          <div className="bg-blue-600 text-white rounded-full p-1">
+            <AlertCircle className="h-4 w-4" />
           </div>
         </div>
+      )}
+
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-start mb-2">
+          <CardTitle className="text-lg font-semibold text-gray-900 line-clamp-2">
+            {report.title || "Denúncia sem título"}
+          </CardTitle>
+          <Badge 
+            variant="outline" 
+            className={`${getStatusColor(report.status)} font-medium ml-2 shrink-0`}
+          >
+            {getStatusLabel(report.status)}
+          </Badge>
+        </div>
+        
+        {showUpdateNotification() && (
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-2 mb-2">
+            <p className="text-sm text-blue-800 font-medium flex items-center">
+              <AlertCircle className="h-4 w-4 mr-1" />
+              Sua denúncia foi analisada!
+            </p>
+          </div>
+        )}
+        
+        <span className="inline-block bg-primary/10 text-primary text-sm font-medium px-2 py-1 rounded">
+          {report.category}
+        </span>
       </CardHeader>
 
-      <CardContent>
-        <p className="text-gray-600 text-sm line-clamp-2 mb-3">{description}</p>
-        
-        <div className="flex items-center text-gray-500 text-xs mt-2">
-          <MapPin className="h-3.5 w-3.5 mr-1" />
-          <span>{location}</span>
+      <CardContent className="space-y-3">
+        {report.image_url && (
+          <div className="w-full h-48 rounded-md overflow-hidden">
+            <img 
+              src={report.image_url} 
+              alt={report.title || "Imagem da denúncia"}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        )}
+
+        <p className="text-gray-700 text-sm line-clamp-3 leading-relaxed">
+          {report.description}
+        </p>
+
+        <div className="flex items-center justify-between text-sm text-gray-500">
+          <div className="flex items-center">
+            <MapPin className="h-4 w-4 mr-1" />
+            <span className="truncate">{report.location}</span>
+          </div>
+          
+          <div className="flex items-center">
+            <Calendar className="h-4 w-4 mr-1" />
+            <span>{new Date(report.created_at).toLocaleDateString('pt-BR')}</span>
+          </div>
         </div>
-        
-        <div className="flex items-center text-gray-500 text-xs mt-1">
-          <Calendar className="h-3.5 w-3.5 mr-1" />
-          <span>{date}</span>
+
+        {/* Show last update info for recently updated reports */}
+        {showUpdateNotification() && report.updated_at && (
+          <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+            Atualizado em {new Date(report.updated_at).toLocaleDateString('pt-BR')} às {new Date(report.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        )}
+
+        <div className="pt-2 border-t">
+          <Link to={`/report/${report.id}`}>
+            <Button variant="outline" size="sm" className="w-full">
+              <Eye className="h-4 w-4 mr-2" />
+              Ver Detalhes
+            </Button>
+          </Link>
         </div>
       </CardContent>
-      
-      <CardFooter className="pt-0">
-        <Link 
-          to={`/report/${id}`} 
-          className="text-primary hover:text-primary-800 text-sm font-medium"
-        >
-          Ver detalhes
-        </Link>
-      </CardFooter>
     </Card>
   );
 };
