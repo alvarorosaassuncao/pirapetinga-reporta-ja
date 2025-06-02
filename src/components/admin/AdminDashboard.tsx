@@ -1,13 +1,15 @@
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Search, FileText, Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ReportStatus } from "@/types/report";
 import ReportManagementCard from "./ReportManagementCard";
+import { useAuth } from "@/context/AuthContext";
 
 interface Report {
   id: string;
@@ -21,63 +23,98 @@ interface Report {
   image_url?: string;
 }
 
+interface Profile {
+  id: string;
+  name: string | null;
+}
+
 const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
-  // Fetch reports
+  // Fetch reports with better error handling
   const {
     data: reports = [],
     isLoading: isLoadingReports,
-    error: reportsError
+    error: reportsError,
+    refetch: refetchReports
   } = useQuery({
-    queryKey: ["admin-reports"],
+    queryKey: ["admin-reports", user?.id],
     queryFn: async () => {
       console.log("Fetching reports for admin dashboard...");
       
-      const { data, error } = await supabase
-        .from("reports")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
-      if (error) {
-        console.error("Error fetching reports:", error);
-        throw error;
-      }
-      
-      console.log("Fetched reports:", data);
-      return data || [];
-    }
-  });
-
-  // Fetch user profiles to get names
-  const {
-    data: profiles = [],
-    isLoading: isLoadingProfiles
-  } = useQuery({
-    queryKey: ["user-profiles"],
-    queryFn: async () => {
-      console.log("Fetching user profiles...");
-      
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, name");
-      
-      if (error) {
-        console.error("Error fetching profiles:", error);
+      if (!user) {
+        console.log("No user found, cannot fetch reports");
         return [];
       }
       
-      console.log("Fetched profiles:", data);
-      return data || [];
-    }
+      try {
+        const { data, error } = await supabase
+          .from("reports")
+          .select("*")
+          .order("created_at", { ascending: false });
+        
+        if (error) {
+          console.error("Error fetching reports:", error);
+          throw new Error(`Erro ao buscar denúncias: ${error.message}`);
+        }
+        
+        console.log("Fetched reports successfully:", data?.length || 0, "reports");
+        return data || [];
+      } catch (error) {
+        console.error("Exception in reports query:", error);
+        throw error;
+      }
+    },
+    enabled: !!user,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
+  });
+
+  // Fetch user profiles with better error handling
+  const {
+    data: profiles = [],
+    isLoading: isLoadingProfiles,
+    error: profilesError
+  } = useQuery({
+    queryKey: ["user-profiles", user?.id],
+    queryFn: async () => {
+      console.log("Fetching user profiles...");
+      
+      if (!user) {
+        console.log("No user found, cannot fetch profiles");
+        return [];
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, name");
+        
+        if (error) {
+          console.error("Error fetching profiles:", error);
+          // Don't throw error for profiles, just return empty array
+          return [];
+        }
+        
+        console.log("Fetched profiles successfully:", data?.length || 0, "profiles");
+        return data || [];
+      } catch (error) {
+        console.error("Exception in profiles query:", error);
+        return [];
+      }
+    },
+    enabled: !!user,
+    retry: 2,
+    retryDelay: 1000
   });
 
   // Get user name by ID
   const getUserName = (userId: string) => {
-    const profile = profiles.find(p => p.id === userId);
+    const profile = profiles.find((p: Profile) => p.id === userId);
     return profile?.name || "Usuário não identificado";
   };
 
@@ -98,7 +135,7 @@ const AdminDashboard = () => {
       
       if (error) {
         console.error("Error updating report status:", error);
-        throw error;
+        throw new Error(`Erro ao atualizar status: ${error.message}`);
       }
       
       console.log("Updated report:", data);
@@ -111,11 +148,11 @@ const AdminDashboard = () => {
         description: `Denúncia foi marcada como ${getStatusLabel(updatedReport.status)}`
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Failed to update status:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível atualizar o status da denúncia",
+        description: error.message || "Não foi possível atualizar o status da denúncia",
         variant: "destructive"
       });
     }
@@ -162,18 +199,35 @@ const AdminDashboard = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Show loading state
   if (isLoadingReports || isLoadingProfiles) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando dashboard administrativo...</p>
+        </div>
       </div>
     );
   }
 
+  // Show error state with retry option
   if (reportsError) {
     return (
       <div className="text-center p-8">
-        <p className="text-red-600">Erro ao carregar denúncias: {reportsError.message}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+          <AlertTriangle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-red-800 mb-2">Erro ao carregar denúncias</h3>
+          <p className="text-red-600 mb-4">
+            {reportsError instanceof Error ? reportsError.message : "Erro desconhecido ao carregar dados"}
+          </p>
+          <button
+            onClick={() => refetchReports()}
+            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+          >
+            Tentar novamente
+          </button>
+        </div>
       </div>
     );
   }
@@ -244,6 +298,20 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Show profiles loading warning if needed */}
+      {profilesError && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardContent className="p-4">
+            <div className="flex items-center text-yellow-800">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              <span className="text-sm">
+                Aviso: Não foi possível carregar nomes dos usuários. Os relatórios ainda funcionam normalmente.
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>

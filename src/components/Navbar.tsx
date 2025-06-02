@@ -17,7 +17,8 @@ import { supabase } from "@/integrations/supabase/client";
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const { user, signOut, userName } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const { user, signOut, userName, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -30,6 +31,8 @@ const Navbar = () => {
       }
       
       try {
+        console.log("Checking admin status for user:", user.email);
+        
         const { data, error } = await supabase
           .from("user_roles")
           .select("role")
@@ -38,8 +41,10 @@ const Navbar = () => {
           .maybeSingle();
         
         if (!error && data) {
+          console.log("User is admin");
           setIsAdmin(true);
         } else {
+          console.log("User is not admin");
           setIsAdmin(false);
         }
       } catch (error) {
@@ -48,27 +53,47 @@ const Navbar = () => {
       }
     };
     
-    checkAdminStatus();
-  }, [user]);
+    if (!loading) {
+      checkAdminStatus();
+    }
+  }, [user, loading]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
   const handleSignOut = async () => {
+    if (isSigningOut) return; // Prevent double clicks
+    
+    setIsSigningOut(true);
+    
     try {
+      console.log("Starting sign out process...");
+      
       await signOut();
+      
       toast({
         title: "Logout realizado com sucesso",
         description: "Você foi desconectado da sua conta."
       });
-      navigate("/");
+      
+      // Close mobile menu if open
+      setIsMenuOpen(false);
+      
+      // Navigate to home after a short delay
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 100);
+      
     } catch (error) {
       console.error("Error signing out:", error);
-    }
-    
-    if (isMenuOpen) {
-      setIsMenuOpen(false);
+      toast({
+        title: "Erro ao sair",
+        description: "Ocorreu um erro ao tentar sair. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -109,14 +134,16 @@ const Navbar = () => {
               <div className="flex items-center ml-2">
                 <span className="text-gray-700 mr-4">
                   Olá, {userName || user.email?.split('@')[0]}
+                  {isAdmin && <span className="text-xs text-blue-600 ml-1">(Admin)</span>}
                 </span>
                 <Button 
                   variant="outline" 
                   onClick={handleSignOut} 
+                  disabled={isSigningOut}
                   className="flex items-center"
                 >
                   <LogOut className="h-4 w-4 mr-2" />
-                  Sair
+                  {isSigningOut ? "Saindo..." : "Sair"}
                 </Button>
               </div>
             ) : (
@@ -184,14 +211,16 @@ const Navbar = () => {
               <div className="pt-2 pb-1">
                 <div className="px-3 py-2 text-base font-medium text-gray-700">
                   Olá, {userName || user.email?.split('@')[0]}
+                  {isAdmin && <span className="text-xs text-blue-600 ml-1">(Admin)</span>}
                 </div>
                 <Button 
                   variant="outline" 
                   onClick={handleSignOut} 
+                  disabled={isSigningOut}
                   className="mt-2 w-full flex items-center"
                 >
                   <LogOut className="h-4 w-4 mr-2" />
-                  Sair
+                  {isSigningOut ? "Saindo..." : "Sair"}
                 </Button>
               </div>
             ) : (
