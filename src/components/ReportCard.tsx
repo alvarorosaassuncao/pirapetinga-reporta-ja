@@ -22,6 +22,12 @@ interface ReportCardProps {
 }
 
 const ReportCard = ({ report }: ReportCardProps) => {
+  // Early return if report is not provided
+  if (!report) {
+    console.warn("ReportCard: report prop is undefined");
+    return null;
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
@@ -49,16 +55,25 @@ const ReportCard = ({ report }: ReportCardProps) => {
 
   // Check if report was recently updated (within last 7 days)
   const isRecentlyUpdated = () => {
-    if (!report.updated_at || report.updated_at === report.created_at) return false;
+    // Safety checks
+    if (!report || !report.updated_at || report.updated_at === report.created_at) {
+      return false;
+    }
     
-    const updateDate = new Date(report.updated_at);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    
-    return updateDate > weekAgo;
+    try {
+      const updateDate = new Date(report.updated_at);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      
+      return updateDate > weekAgo;
+    } catch (error) {
+      console.error("Error parsing update date:", error);
+      return false;
+    }
   };
 
   const showUpdateNotification = () => {
+    if (!report) return false;
     return isRecentlyUpdated() && (report.status === 'resolved' || report.status === 'rejected' || report.status === 'in-progress');
   };
 
@@ -80,9 +95,9 @@ const ReportCard = ({ report }: ReportCardProps) => {
           </CardTitle>
           <Badge 
             variant="outline" 
-            className={`${getStatusColor(report.status)} font-medium ml-2 shrink-0`}
+            className={`${getStatusColor(report.status || 'pending')} font-medium ml-2 shrink-0`}
           >
-            {getStatusLabel(report.status)}
+            {getStatusLabel(report.status || 'pending')}
           </Badge>
         </div>
         
@@ -96,7 +111,7 @@ const ReportCard = ({ report }: ReportCardProps) => {
         )}
         
         <span className="inline-block bg-primary/10 text-primary text-sm font-medium px-2 py-1 rounded">
-          {report.category}
+          {report.category || "Sem categoria"}
         </span>
       </CardHeader>
 
@@ -113,18 +128,20 @@ const ReportCard = ({ report }: ReportCardProps) => {
         )}
 
         <p className="text-gray-700 text-sm line-clamp-3 leading-relaxed">
-          {report.description}
+          {report.description || "Sem descrição"}
         </p>
 
         <div className="flex items-center justify-between text-sm text-gray-500">
           <div className="flex items-center">
             <MapPin className="h-4 w-4 mr-1" />
-            <span className="truncate">{report.location}</span>
+            <span className="truncate">{report.location || "Local não informado"}</span>
           </div>
           
           <div className="flex items-center">
             <Calendar className="h-4 w-4 mr-1" />
-            <span>{new Date(report.created_at).toLocaleDateString('pt-BR')}</span>
+            <span>
+              {report.created_at ? new Date(report.created_at).toLocaleDateString('pt-BR') : "Data não disponível"}
+            </span>
           </div>
         </div>
 
