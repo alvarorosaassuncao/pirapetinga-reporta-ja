@@ -12,7 +12,7 @@ import { Mail } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const Login = () => {
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,22 +24,37 @@ const Login = () => {
   // Get the path the user was trying to access before being redirected to login
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
   
+  // Redirect if already logged in
+  useState(() => {
+    if (user) {
+      console.log("User already logged in, redirecting to:", from);
+      navigate(from === "/login" ? "/" : from, { replace: true });
+    }
+  });
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
+      console.log("Attempting login with email:", email);
       await signIn(email, password);
+      
       toast({
         title: "Login realizado com sucesso!",
         description: "Redirecionando...",
       });
       
-      // Redirect the user back to where they were trying to go
-      navigate(from, { replace: true });
+      // Wait a bit for auth state to update, then redirect
+      setTimeout(() => {
+        const redirectPath = from === "/login" ? "/" : from;
+        console.log("Redirecting to:", redirectPath);
+        navigate(redirectPath, { replace: true });
+      }, 500);
+      
     } catch (error) {
-      // Error is already handled in signIn function
       console.error("Login error:", error);
+      // Error is already handled in signIn function
     } finally {
       setIsLoading(false);
     }
@@ -56,8 +71,8 @@ const Login = () => {
         description: "Por favor, aguarde...",
       });
     } catch (error) {
-      // Error is already handled in signInWithGoogle function
       console.error("Google login error:", error);
+      // Error is already handled in signInWithGoogle function
     } finally {
       setIsLoading(false);
     }
