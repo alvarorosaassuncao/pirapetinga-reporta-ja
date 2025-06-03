@@ -25,10 +25,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
     
-    // Check active sessions and set the user
-    const checkUser = async () => {
+    const initializeAuth = async () => {
       try {
-        console.log("AuthContext: Checking current session...");
+        console.log("AuthContext: Initializing authentication...");
+        
+        // Get current session
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -41,51 +42,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         
-        console.log("AuthContext: Current session:", session?.user?.email || "No session");
+        console.log("AuthContext: Session found:", session?.user?.email || "No session");
         
         if (mounted) {
           setUser(session?.user ?? null);
           
           if (session?.user) {
-            // Fetch user profile data including name
-            try {
-              const { data } = await supabase
-                .from('profiles')
-                .select('name')
-                .eq('id', session.user.id)
-                .maybeSingle();
-              
-              if (mounted) {
-                if (data) {
-                  setUserName(data.name);
-                } else {
-                  setUserName(session.user.user_metadata?.name || session.user.email?.split('@')[0] || null);
-                }
-              }
-            } catch (profileError) {
-              console.error("AuthContext: Error fetching profile:", profileError);
-              if (mounted) {
-                setUserName(session.user.user_metadata?.name || session.user.email?.split('@')[0] || null);
-              }
-            }
+            await fetchUserProfile(session.user);
           } else {
             setUserName(null);
           }
+          
+          setLoading(false);
         }
       } catch (error) {
-        console.error("AuthContext: Error checking session:", error);
+        console.error("AuthContext: Error initializing auth:", error);
         if (mounted) {
           setUser(null);
           setUserName(null);
-        }
-      } finally {
-        if (mounted) {
           setLoading(false);
         }
       }
     };
 
-    checkUser();
+    const fetchUserProfile = async (currentUser: User) => {
+      if (!mounted) return;
+      
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+        
+        if (mounted) {
+          if (data?.name) {
+            setUserName(data.name);
+          } else {
+            setUserName(currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || null);
+          }
+        }
+      } catch (error) {
+        console.error("AuthContext: Error fetching profile:", error);
+        if (mounted) {
+          setUserName(currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || null);
+        }
+      }
+    };
+
+    // Initialize auth
+    initializeAuth();
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -94,39 +100,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (!mounted) return;
         
-        setUser(session?.user ?? null);
-        
-        if (session?.user && event !== 'SIGNED_OUT') {
-          // Fetch user profile data only if not signing out
-          try {
-            const { data } = await supabase
-              .from('profiles')
-              .select('name')
-              .eq('id', session.user.id)
-              .maybeSingle();
-            
-            if (mounted) {
-              if (data) {
-                setUserName(data.name);
-              } else {
-                setUserName(session.user.user_metadata?.name || session.user.email?.split('@')[0] || null);
-              }
-            }
-          } catch (error) {
-            console.error("AuthContext: Error fetching profile in auth change:", error);
-            if (mounted) {
-              setUserName(session.user.user_metadata?.name || session.user.email?.split('@')[0] || null);
-            }
-          }
-        } else {
-          if (mounted) {
-            setUserName(null);
-          }
-        }
-        
-        if (mounted) {
+        if (event === 'SIGNED_OUT' || !session) {
+          setUser(null);
+          setUserName(null);
           setLoading(false);
+          return;
         }
+        
+        setUser(session.user);
+        
+        if (session.user) {
+          await fetchUserProfile(session.user);
+        }
+        
+        setLoading(false);
       }
     );
 
@@ -227,29 +214,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      console.log("AuthContext: Starting sign out...");
       setLoading(true);
-      console.log("AuthContext: Attempting to sign out...");
       
-      // Clear local state first
+      // Clear local state immediately
       setUser(null);
       setUserName(null);
       
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error("AuthContext: Sign out error:", error);
-        throw error;
+        // Don't throw error, just log it
       }
       
-      console.log("AuthContext: Sign out successful");
+      console.log("AuthContext: Sign out completed");
       
     } catch (error: any) {
       console.error("AuthContext: Sign out failed:", error);
-      toast({
-        title: "Erro ao sair",
-        description: error.message || "Ocorreu um erro ao tentar sair. Tente novamente.",
-        variant: "destructive",
-      });
-      throw error;
+      // Still clear local state even if signOut fails
+      setUser(null);
+      setUserName(null);
     } finally {
       setLoading(false);
     }

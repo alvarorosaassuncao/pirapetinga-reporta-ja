@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { 
   Menu,
   MapPin, 
-  List,
-  User,
   LogOut,
   Shield
 } from "lucide-react";
@@ -18,6 +16,7 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
   const { user, signOut, userName, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -25,10 +24,12 @@ const Navbar = () => {
   // Check if user is admin
   useEffect(() => {
     const checkAdminStatus = async () => {
-      if (!user) {
+      if (!user || loading) {
         setIsAdmin(false);
         return;
       }
+      
+      setAdminLoading(true);
       
       try {
         console.log("Checking admin status for user:", user.email);
@@ -50,12 +51,12 @@ const Navbar = () => {
       } catch (error) {
         console.error("Error checking admin status:", error);
         setIsAdmin(false);
+      } finally {
+        setAdminLoading(false);
       }
     };
     
-    if (!loading) {
-      checkAdminStatus();
-    }
+    checkAdminStatus();
   }, [user, loading]);
 
   const toggleMenu = () => {
@@ -80,10 +81,11 @@ const Navbar = () => {
       // Close mobile menu if open
       setIsMenuOpen(false);
       
-      // Navigate to home after a short delay
-      setTimeout(() => {
-        navigate("/", { replace: true });
-      }, 100);
+      // Clear admin state
+      setIsAdmin(false);
+      
+      // Navigate to home
+      navigate("/", { replace: true });
       
     } catch (error) {
       console.error("Error signing out:", error);
@@ -121,7 +123,7 @@ const Navbar = () => {
                 <Link to="/my-reports" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md font-medium">
                   Minhas Denúncias
                 </Link>
-                {isAdmin && (
+                {isAdmin && !adminLoading && (
                   <Link to="/admin" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md font-medium flex items-center">
                     <Shield className="h-4 w-4 mr-1" />
                     Admin
@@ -134,7 +136,7 @@ const Navbar = () => {
               <div className="flex items-center ml-2">
                 <span className="text-gray-700 mr-4">
                   Olá, {userName || user.email?.split('@')[0]}
-                  {isAdmin && <span className="text-xs text-blue-600 ml-1">(Admin)</span>}
+                  {isAdmin && !adminLoading && <span className="text-xs text-blue-600 ml-1">(Admin)</span>}
                 </span>
                 <Button 
                   variant="outline" 
@@ -194,7 +196,7 @@ const Navbar = () => {
                 >
                   Minhas Denúncias
                 </Link>
-                {isAdmin && (
+                {isAdmin && !adminLoading && (
                   <Link 
                     to="/admin" 
                     className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-secondary flex items-center"
@@ -211,7 +213,7 @@ const Navbar = () => {
               <div className="pt-2 pb-1">
                 <div className="px-3 py-2 text-base font-medium text-gray-700">
                   Olá, {userName || user.email?.split('@')[0]}
-                  {isAdmin && <span className="text-xs text-blue-600 ml-1">(Admin)</span>}
+                  {isAdmin && !adminLoading && <span className="text-xs text-blue-600 ml-1">(Admin)</span>}
                 </div>
                 <Button 
                   variant="outline" 

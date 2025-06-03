@@ -16,6 +16,8 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
     queryFn: async () => {
       if (!user) return false;
       
+      console.log("AdminRoute: Checking admin status for user:", user.email);
+      
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
@@ -24,13 +26,16 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
         .maybeSingle();
       
       if (error) {
-        console.error("Error checking admin status:", error);
+        console.error("AdminRoute: Error checking admin status:", error);
         return false;
       }
       
+      console.log("AdminRoute: Admin check result:", !!data);
       return !!data;
     },
-    enabled: !!user
+    enabled: !!user && !authLoading,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: 1
   });
 
   if (authLoading || adminLoading) {
@@ -42,10 +47,12 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
   }
 
   if (!user) {
+    console.log("AdminRoute: No user, redirecting to login");
     return <Navigate to="/login" replace />;
   }
 
   if (!isAdmin) {
+    console.log("AdminRoute: User is not admin, redirecting to home");
     return <Navigate to="/" replace />;
   }
 

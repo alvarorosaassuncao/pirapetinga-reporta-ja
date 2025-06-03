@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Mail } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const Login = () => {
-  const { signIn, signInWithGoogle, user } = useAuth();
+  const { signIn, signInWithGoogle, user, loading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -25,15 +25,19 @@ const Login = () => {
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
   
   // Redirect if already logged in
-  useState(() => {
-    if (user) {
+  useEffect(() => {
+    if (!loading && user) {
       console.log("User already logged in, redirecting to:", from);
-      navigate(from === "/login" ? "/" : from, { replace: true });
+      const redirectPath = from === "/login" ? "/" : from;
+      navigate(redirectPath, { replace: true });
     }
-  });
+  }, [user, loading, navigate, from]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLoading) return;
+    
     setIsLoading(true);
     
     try {
@@ -45,12 +49,7 @@ const Login = () => {
         description: "Redirecionando...",
       });
       
-      // Wait a bit for auth state to update, then redirect
-      setTimeout(() => {
-        const redirectPath = from === "/login" ? "/" : from;
-        console.log("Redirecting to:", redirectPath);
-        navigate(redirectPath, { replace: true });
-      }, 500);
+      // Navigation will be handled by the useEffect hook above
       
     } catch (error) {
       console.error("Login error:", error);
@@ -61,11 +60,12 @@ const Login = () => {
   };
 
   const handleGoogleLogin = async () => {
+    if (isLoading) return;
+    
     setIsLoading(true);
     
     try {
       await signInWithGoogle();
-      // The redirect is handled by Supabase, but we'll show a toast anyway
       toast({
         title: "Redirecionando para autenticação do Google",
         description: "Por favor, aguarde...",
@@ -77,6 +77,20 @@ const Login = () => {
       setIsLoading(false);
     }
   };
+
+  // Show loading if auth is still loading
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Don't render login form if user is already logged in
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -129,6 +143,7 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu.email@exemplo.com"
                 required
+                disabled={isLoading}
               />
             </div>
             
@@ -146,6 +161,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                disabled={isLoading}
               />
             </div>
             
